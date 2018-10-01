@@ -1545,13 +1545,23 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 	このファイルの存在するディレクトリに対する書き込み権とともに必
 	要です
 
+..
   cgroup.controllers
 	A read-only space separated values file which exists on all
 	cgroups.
 
 	It shows space separated list of all controllers available to
 	the cgroup.  The controllers are not ordered.
+..
 
+  cgroup.controllers
+	読み込み専用のスペース区切りの値のファイルです。すべての
+	cgroup に存在します。
+
+	その cgroup で使えるすべてのコントローラのスペース区切りのリス
+	トを示します。コントローラの並べかえは行われません。
+
+..
   cgroup.subtree_control
 	A read-write space separated values file which exists on all
 	cgroups.  Starts out empty.
@@ -1566,7 +1576,25 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 	disables.  If a controller appears more than once on the list,
 	the last one is effective.  When multiple enable and disable
 	operations are specified, either all succeed or all fail.
+..
 
+  cgroup.subtree_control
+	読み書き可能なスペース区切りのファイルです。すべての cgroup に
+	存在します。最初は空のファイルです。
+
+	読み込み時は、コントローラのスペース区切りのリストを示します。
+	リストされたコントローラは、その cgroup から子供に対してリソー
+	ス分配をコントロールできるコントローラです。
+
+	'+' または '-' が頭に付いたコントローラをスペース区切りで書き
+	込むと、コントローラを有効にしたり無効にしたりできます。'+' が
+	頭に付いたコントローラは有効になり、'-' が頭に付いたコントロー
+	ラは無効になります。リストに同じコントローラが複数回現れた場合
+	は、最後に指定されたコントローラが有効になります。複数の有効化、
+	無効化の操作が指定した場合、すべて成功するか、すべて失敗するか
+	のどちらかです。
+	
+..
   cgroup.events
 	A read-only flat-keyed file which exists on non-root cgroups.
 	The following entries are defined.  Unless specified
@@ -1576,6 +1604,17 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 	  populated
 		1 if the cgroup or its descendants contains any live
 		processes; otherwise, 0.
+..
+
+  cgroup.events
+	読み込み専用のフラットなキーのファイルです。root 以外の cgroup
+	に存在します。以下のエントリが定義されています。他に特に規定が
+	なければ、このファイルの値の変更は、ファイルが変更されたイベン
+	トを生成します。
+
+	  populated
+		その cgroup かその cgroup の子孫が実行中のプロセスを含
+		む場合は 1、そうでなければ 0 となります。
 
   cgroup.max.descendants
 	A read-write single value files.  The default is "max".
