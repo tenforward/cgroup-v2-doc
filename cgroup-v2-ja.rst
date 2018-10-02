@@ -2295,49 +2295,84 @@ CPU インターフェースファイル
 	higher than the limit for an extended period of time.  This
 	reduces the impact on the workload and memory management.
 
+..
+  Usage Guidelines
+  ~~~~~~~~~~~~~~~~
+使用量のガイドライン
+~~~~~~~~~~~~~~~~~~~~
+..
+  "memory.high" is the main mechanism to control memory usage.
+  Over-committing on high limit (sum of high limits > available memory)
+  and letting global memory pressure to distribute memory according to
+  usage is a viable strategy.
+"memory.high" は、メモリ使用量をコントロールするためのメインのメカニズ
+ムです。上限をオーバーコミット (上限の和 > 使用可能なメモリ) し、グロー
+バルなメモリ圧力に使用量に応じてメモリを分配させることは実行可能な戦略
+です。
 
-Usage Guidelines
-~~~~~~~~~~~~~~~~
+..
+  Because breach of the high limit doesn't trigger the OOM killer but
+  throttles the offending cgroup, a management agent has ample
+  opportunities to monitor and take appropriate actions such as granting
+  more memory or terminating the workload.
+上限を突き破ることは OOM killer のトリガーでなく、対象の cgroup の調整
+を行うことになるため、管理エージェントがモニタリングする機会をたっぷり
+持ち、より多くのメモリを与えると言った対応や、高負荷を終了させると言っ
+た対応のような、適切なアクションが取れます。
 
-"memory.high" is the main mechanism to control memory usage.
-Over-committing on high limit (sum of high limits > available memory)
-and letting global memory pressure to distribute memory according to
-usage is a viable strategy.
+..
+  Determining whether a cgroup has enough memory is not trivial as
+  memory usage doesn't indicate whether the workload can benefit from
+  more memory.  For example, a workload which writes data received from
+  network to a file can use all available memory but can also operate as
+  performant with a small amount of memory.  A measure of memory
+  pressure - how much the workload is being impacted due to lack of
+  memory - is necessary to determine whether a workload needs more
+  memory; unfortunately, memory pressure monitoring mechanism isn't
+  implemented yet.
+作業がよりメモリを与えることで利益を得るかどうかは、メモリ使用量からは
+わからないように、cgroup が十分なメモリを持っているかどうかを判定する
+のは自明ではありません。例えば、ネットワークから受信したデータをファイ
+ルに書く作業はすべての使用可能なメモリを使う可能性がありますが、少ない
+メモリでの動作として操作もできます。メモリ圧力の測定、つまりメモリの不
+足が作業にどのくらいインパクトを与えるのかは、作業がより多くのメモリを
+必要としているかどうかを判定するのに必要です。不幸なことに、メモリ圧力
+をモニタリングする仕組みはまだ実装されていません。
 
-Because breach of the high limit doesn't trigger the OOM killer but
-throttles the offending cgroup, a management agent has ample
-opportunities to monitor and take appropriate actions such as granting
-more memory or terminating the workload.
+..
+  Memory Ownership
+  ~~~~~~~~~~~~~~~~
+メモリの所有権
+~~~~~~~~~~~~~~
+..
+  A memory area is charged to the cgroup which instantiated it and stays
+  charged to the cgroup until the area is released.  Migrating a process
+  to a different cgroup doesn't move the memory usages that it
+  instantiated while in the previous cgroup to the new cgroup.
+メモリ領域は、インスタンス化された cgroup にチャージされ、領域が開放さ
+れるまでその cgroup にチャージし続けられます。異なる cgroup へのプロセ
+スのマイグレーションでは、移動前の cgroup 内でインスタンス化されている
+メモリ消費が新しい cgroup へ移動しません。
 
-Determining whether a cgroup has enough memory is not trivial as
-memory usage doesn't indicate whether the workload can benefit from
-more memory.  For example, a workload which writes data received from
-network to a file can use all available memory but can also operate as
-performant with a small amount of memory.  A measure of memory
-pressure - how much the workload is being impacted due to lack of
-memory - is necessary to determine whether a workload needs more
-memory; unfortunately, memory pressure monitoring mechanism isn't
-implemented yet.
+..
+  A memory area may be used by processes belonging to different cgroups.
+  To which cgroup the area will be charged is in-deterministic; however,
+  over time, the memory area is likely to end up in a cgroup which has
+  enough memory allowance to avoid high reclaim pressure.
+メモリ領域は、他の cgroup に属するプロセスが使う可能性があります。領域
+がどの cgroup にチャージされるかは常にひとつに決まります。しかし、時間
+の経過とともに、メモリ領域は高いメモリ回収圧力を避けることができる十分
+なメモリを持った cgroup 内に落ち着くでしょう。
 
-
-Memory Ownership
-~~~~~~~~~~~~~~~~
-
-A memory area is charged to the cgroup which instantiated it and stays
-charged to the cgroup until the area is released.  Migrating a process
-to a different cgroup doesn't move the memory usages that it
-instantiated while in the previous cgroup to the new cgroup.
-
-A memory area may be used by processes belonging to different cgroups.
-To which cgroup the area will be charged is in-deterministic; however,
-over time, the memory area is likely to end up in a cgroup which has
-enough memory allowance to avoid high reclaim pressure.
-
-If a cgroup sweeps a considerable amount of memory which is expected
-to be accessed repeatedly by other cgroups, it may make sense to use
-POSIX_FADV_DONTNEED to relinquish the ownership of memory areas
-belonging to the affected files to ensure correct memory ownership.
-
+..
+  If a cgroup sweeps a considerable amount of memory which is expected
+  to be accessed repeatedly by other cgroups, it may make sense to use
+  POSIX_FADV_DONTNEED to relinquish the ownership of memory areas
+  belonging to the affected files to ensure correct memory ownership.
+ある cgroup が、他の cgroup から定期的にアクセスされるであろう相当量の
+メモリを一掃した場合、正しいメモリ所有権を保証するために、影響を受ける
+ファイルが属するメモリ領域を放棄するために POSIX_FADV_DONTNEED を使う
+意味があるかもしれません。
 
 IO
 --
