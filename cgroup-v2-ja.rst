@@ -1783,42 +1783,73 @@ CPU インターフェースファイル
 	であることを示します。値をひとつだけ書き込んだ場合は $MAX が更
 	新されます。
 
-Memory
-------
+..
+  Memory
+  ------
+メモリー
+--------
+..
+  The "memory" controller regulates distribution of memory.  Memory is
+  stateful and implements both limit and protection models.  Due to the
+  intertwining between memory usage and reclaim pressure and the
+  stateful nature of memory, the distribution model is relatively
+  complex.
+"memory" コントローラはメモリの分配を調整します。メモリはステートフル
+で制限と保護の両方のモデルを実装します。メモリ消費量と回収圧力とメモリ
+のステートフルな性質を結びつけるため、分配モデルは比較的複雑になります。
 
-The "memory" controller regulates distribution of memory.  Memory is
-stateful and implements both limit and protection models.  Due to the
-intertwining between memory usage and reclaim pressure and the
-stateful nature of memory, the distribution model is relatively
-complex.
+..
+  While not completely water-tight, all major memory usages by a given
+  cgroup are tracked so that the total memory consumption can be
+  accounted and controlled to a reasonable extent.  Currently, the
+  following types of memory usages are tracked.
+完全ではないものの、トータルのメモリ消費がカウントされ、合理的な範囲に
+制御されることができるように、与えられた cgroup に対するすべての主なメ
+モリ消費が追跡されます。
 
-While not completely water-tight, all major memory usages by a given
-cgroup are tracked so that the total memory consumption can be
-accounted and controlled to a reasonable extent.  Currently, the
-following types of memory usages are tracked.
+..
+  - Userland memory - page cache and anonymous memory.
+- ユーザランドのメモリ - ページキャッシュとアノニマスメモリ
 
-- Userland memory - page cache and anonymous memory.
+..
+  - Kernel data structures such as dentries and inodes.
+- dentry や inode のようなカーネルデータ構造
 
-- Kernel data structures such as dentries and inodes.
+..
+  - TCP socket buffers.
+- TCP ソケットバッファ
 
-- TCP socket buffers.
+..
+  The above list may expand in the future for better coverage.
+上記のリストは将来カバーする範囲の改良のために拡張されるかもしれません。
 
-The above list may expand in the future for better coverage.
+..
+  Memory Interface Files
+  ~~~~~~~~~~~~~~~~~~~~~~
+メモリーインターフェースファイル
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+..
+  All memory amounts are in bytes.  If a value which is not aligned to
+  PAGE_SIZE is written, the value may be rounded up to the closest
+  PAGE_SIZE multiple when read back.
+すべてのメモリ量はバイトです。PAGE_SIZE で割り切れない値が書かれてい
+る場合、その値は読み出しの際に最も近い PAGE_SIZE に切り上げられるかも
+しれません。
 
-
-Memory Interface Files
-~~~~~~~~~~~~~~~~~~~~~~
-
-All memory amounts are in bytes.  If a value which is not aligned to
-PAGE_SIZE is written, the value may be rounded up to the closest
-PAGE_SIZE multiple when read back.
-
+..
   memory.current
 	A read-only single value file which exists on non-root
 	cgroups.
 
 	The total amount of memory currently being used by the cgroup
 	and its descendants.
+..
+
+  memory.current
+	読み込み専用の単一の値のファイルです。root 以外の cgroup に存
+	在します。
+
+	その cgroup と子孫が現在使っているメモリの総量です。
 
   memory.min
 	A read-write single value file which exists on non-root
@@ -1830,7 +1861,7 @@ PAGE_SIZE multiple when read back.
 	unprotected reclaimable memory available, OOM killer
 	is invoked.
 
-       Effective min boundary is limited by memory.min values of
+	Effective min boundary is limited by memory.min values of
 	all ancestor cgroups. If there is memory.min overcommitment
 	(child cgroup or cgroups are requiring more protected memory
 	than parent will allow), then each child cgroup will get
@@ -1843,6 +1874,7 @@ PAGE_SIZE multiple when read back.
 	If a memory cgroup is not populated with processes,
 	its memory.min is ignored.
 
+..
   memory.low
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "0".
@@ -1861,7 +1893,29 @@ PAGE_SIZE multiple when read back.
 
 	Putting more memory than generally available under this
 	protection is discouraged.
+..
 
+  memory.low
+
+	読み書き可能な単一の値のファイルです。root 以外の cgroup に存
+	在し、デフォルト値は "0" です。
+
+	ベストエフォートのメモリ保護です。ある cgroup とすべての祖先の
+	メモリ使用量が low 限界より下であれば、保護されていない cgroup
+	からの回収ができない場合をのぞいて、その cgroup のメモリが回収
+	されることはないでしょう。
+
+	Effective low boundary is limited by memory.low values of
+	all ancestor cgroups. If there is memory.low overcommitment
+	(child cgroup or cgroups are requiring more protected memory
+	than parent will allow), then each child cgroup will get
+	the part of parent's protection proportional to its
+	actual memory usage below memory.low.
+
+	この保護の下に一般的に利用可能な以上のメモリを置くことは推奨し
+	ません。
+
+..
   memory.high
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "max".
@@ -1873,7 +1927,21 @@ PAGE_SIZE multiple when read back.
 
 	Going over the high limit never invokes the OOM killer and
 	under extreme conditions the limit may be breached.
+..
 
+  memory.high
+	読み書き可能な単一の値のファイルです。root 以外の cgroup に存
+	在します。デフォルト値は "max" です。
+
+	メモリ使用量スロットルの制限値です。これが cgroup のメモリ使用
+	量をコントロールするためのメインのメカニズムです。cgroup のメ
+	モリ使用量が上限を超えた場合、cgroup のプロセスは調節され、厳
+	しい回収圧力の下に置かれます。
+
+	上限の超過は決して OOM killer を呼び出すことはありません。極限
+	の状態下では、制限値を超えるかもしれません。
+
+..
   memory.max
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "max".
@@ -1887,7 +1955,22 @@ PAGE_SIZE multiple when read back.
 	This is the ultimate protection mechanism.  As long as the
 	high limit is used and monitored properly, this limit's
 	utility is limited to providing the final safety net.
+..
 
+  memory.max
+	読み書き可能な単一の値を含むファイルです。root 以外の cgroup
+	に存在します。デフォルト値は "max" です。
+
+	メモリ使用量のハードリミットで、最後の保護メカニズムです。
+	cgroup のメモリ使用量がこの制限に達し、減らすことができない場
+	合、OOM killer が cgroup内で呼びだされます。特定の環境下では、
+	使用量が一時的に制限を超えるかもしれません。
+
+	これは最終的な保護メカニズムです。high の制限を使い、適切にモ
+	ニタリングされている限り、この制限は最終的なセーフティーネット
+	を提供という役割に限られるでしょう。
+
+..
   memory.events
 	A read-only flat-keyed file which exists on non-root cgroups.
 	The following entries are defined.  Unless specified
@@ -1928,7 +2011,36 @@ PAGE_SIZE multiple when read back.
 	  oom_kill
 		The number of processes belonging to this cgroup
 		killed by any kind of OOM killer.
+..
 
+  memory.events
+	読み込み専用のフラットなキーのファイルです。root 以外の cgroup
+	に存在します。以下のエントリが定義されています。特に指定しない
+	限り、このファイルの値の変更はファイルが修正されたイベントを生
+	成します。
+
+	  low
+		cgroup で、使用量が low 以下であるにも関わらず、高いメ
+		モリ圧力により回収が行われた回数です。これは、通常は
+		low の値がオーバーコミットされていることを示します。
+
+	  high
+		high の値を超過したため、cgroup のプロセス数が調節され、
+		直接メモリ回収が実行された回数です。グローバルのメモリ
+		圧力よりもhigh の制限でメモリ使用量が制限されている
+		cgroup では、このイベントの発生が起こる可能性がありま
+		す。
+
+	  max
+		cgroupのメモリ使用量が max 制限を超えようとした回数で
+		す。直接メモリ回収がメモリ使用量の減少に失敗した場合、
+		cgroup は OOM 状態に移行します。
+
+	  oom_kill
+		この cgroup に属するプロセスが、あらゆる種類の OOM
+		killer によって kill された回数。
+
+..
   memory.stat
 	A read-only flat-keyed file which exists on non-root cgroups.
 
@@ -2033,20 +2145,134 @@ PAGE_SIZE multiple when read back.
 	  pglazyfreed
 
 		Amount of reclaimed lazyfree pages
+..
 
+  memory.stat
+	読み込み専用のフラットキーなファイルです。root 以外の cgroup
+	に存在します。
+
+	このファイルは cgroup のメモリ使用を、異なるタイプのメモリ、タイ
+	プごとの詳細、状態に応じた他の情報、メモリ管理システムの過去の
+	イベントに分解します。
+
+	メモリ量の単位はすべて byte です。
+
+	各エントリは人が読みやすいように並べられます。新しいエントリが
+	途中で現れることもあります。項目が決まった位置にあることを期待
+	しないでください。特定の値を見つけるのにはキーを使いましょう!
+
+	  anon
+		brk(), sbrk(), mmap(MAP_ANONYMOUS) のような匿名マッピ
+		ングに使われているメモリ量
+
+	  file
+		tmpfs や共有メモリを含む、ファイルシステムデータのキャッ
+		シュに使われているメモリ量
+
+	  kernel_stack
+		Amount of memory allocated to kernel stacks.
+
+	  slab
+		Amount of memory used for storing in-kernel data
+		structures.
+
+	  sock
+		Amount of memory used in network transmission buffers
+
+	  shmem
+		Amount of cached filesystem data that is swap-backed,
+		such as tmpfs, shm segments, shared anonymous mmap()s
+
+	  file_mapped
+		mmap()でマップされたファイルシステムのキャッシュデータ
+		の量
+
+	  file_dirty
+		変更されたがまだディスクに書き戻されていないファイルシ
+		ステムのキャッシュデータの量
+
+	  file_writeback
+		変更されて、ディスクに書き戻し中のファイルシステムの
+		キャッシュデータの量
+
+	  inactive_anon, active_anon, inactive_file, active_file, unevictable
+		ページ回収アルゴリズムが使う内部的なメモリ管理リスト上
+		のメモリ量、Swap-backedの量、Filesystem-backed の量
+
+	  slab_reclaimable
+		Part of "slab" that might be reclaimed, such as
+		dentries and inodes.
+
+	  slab_unreclaimable
+		Part of "slab" that cannot be reclaimed on memory
+		pressure.
+
+	  pgfault
+		ページフォルトの総数
+
+	  pgmajfault
+		メジャーページフォルトの総数
+
+	  workingset_refault
+		Number of refaults of previously evicted pages
+
+	  workingset_activate
+		Number of refaulted pages that were immediately activated
+
+	  workingset_nodereclaim
+		Number of times a shadow node has been reclaimed
+
+	  pgrefill
+		Amount of scanned pages (in an active LRU list)
+
+	  pgscan
+		Amount of scanned pages (in an inactive LRU list)
+
+	  pgsteal
+		Amount of reclaimed pages
+
+	  pgactivate
+		Amount of pages moved to the active LRU list
+
+	  pgdeactivate
+		Amount of pages moved to the inactive LRU lis
+
+	  pglazyfree
+		Amount of pages postponed to be freed under memory pressure
+
+	  pglazyfreed
+		Amount of reclaimed lazyfree pages
+
+..
   memory.swap.current
 	A read-only single value file which exists on non-root
 	cgroups.
 
 	The total amount of swap currently being used by the cgroup
 	and its descendants.
+..
 
+  memory.swap.current
+	読み込み専用の単一の値を含むファイル。root 以外の cgroup に存
+	在します。
+
+	cgroup と自分の子孫が現在使用中の swap の総量。
+
+..
   memory.swap.max
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "max".
 
 	Swap usage hard limit.  If a cgroup's swap usage reaches this
 	limit, anonymous memory of the cgroup will not be swapped out.
+..
+
+  memory.swap.max
+	読み書き可能な単一の値を含むファイル。root 以外の cgroup に存
+	在します。デフォルト値は "max"。
+
+	スワップ使用量のハードリミット。cgroup のスワップ使用量がこの
+	制限に達した場合、cgroup の匿名メモリはスワップアウトしません。
 
   memory.swap.events
 	A read-only flat-keyed file which exists on non-root cgroups.
