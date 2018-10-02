@@ -4,7 +4,7 @@ Control Group v2
 
 :Date: October, 2015
 :Author: Tejun Heo <tj@kernel.org>
-:Translation: KATOH Yasufumi <karma at jazz.email.ne.jp>
+:Translator: KATOH Yasufumi <karma at jazz.email.ne.jp>
 
 ..
   This is the authoritative documentation on the design, interface and
