@@ -1593,7 +1593,7 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 	は、最後に指定されたコントローラが有効になります。複数の有効化、
 	無効化の操作が指定した場合、すべて成功するか、すべて失敗するか
 	のどちらかです。
-	
+
 ..
   cgroup.events
 	A read-only flat-keyed file which exists on non-root cgroups.
@@ -1648,31 +1648,53 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 		A dying cgroup can consume system resources not exceeding
 		limits, which were active at the moment of cgroup deletion.
 
-
-Controllers
-===========
+..
+  Controllers
+  ===========
+コントローラー
+==============
 
 CPU
 ---
 
-The "cpu" controllers regulates distribution of CPU cycles.  This
-controller implements weight and absolute bandwidth limit models for
-normal scheduling policy and absolute bandwidth allocation model for
-realtime scheduling policy.
+..
+  The "cpu" controllers regulates distribution of CPU cycles.  This
+  controller implements weight and absolute bandwidth limit models for
+  normal scheduling policy and absolute bandwidth allocation model for
+  realtime scheduling policy.
 
-WARNING: cgroup2 doesn't yet support control of realtime processes and
-the cpu controller can only be enabled when all RT processes are in
-the root cgroup.  Be aware that system management software may already
-have placed RT processes into nonroot cgroups during the system boot
-process, and these processes may need to be moved to the root cgroup
-before the cpu controller can be enabled.
+"cpu" コントローラは CPU サイクルの分配を調整します。このコントローラ
+は、通常のスケジューリングポリシー用に weight と絶対値バンド幅制限のモ
+デルを実装します。また、リアルタイムスケジューリングポリシー用に絶対値
+バンド幅制限を実装します。
 
+..
+  WARNING: cgroup2 doesn't yet support control of realtime processes and
+  the cpu controller can only be enabled when all RT processes are in
+  the root cgroup.  Be aware that system management software may already
+  have placed RT processes into nonroot cgroups during the system boot
+  process, and these processes may need to be moved to the root cgroup
+  before the cpu controller can be enabled.
 
-CPU Interface Files
-~~~~~~~~~~~~~~~~~~~
+警告: cgroup2 は、まだリアルタイムプロセスを扱えません。cpu コントロー
+ラーは、すべての RT プロセスが root cgroup にあるときのみ有効化できま
+す。システム管理ソフトウェアが、システムブートプロセス時に root cgroup
+以外に RT プロセスを配置しているかもしれません。これらのプロセスは、
+cpuコントローラーを有効にする前に root cgroup に移動させる必要がありま
+す。
 
-All time durations are in microseconds.
+..
+  CPU Interface Files
+  ~~~~~~~~~~~~~~~~~~~
+CPU インターフェースファイル
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+..
+  All time durations are in microseconds.
+
+すべて、時間の単位はマイクロ秒です。
+
+..
   cpu.stat
 	A read-only flat-keyed file which exists on non-root cgroups.
 	This file exists whether the controller is enabled or not.
@@ -1688,12 +1710,39 @@ All time durations are in microseconds.
 	- nr_periods
 	- nr_throttled
 	- throttled_usec
+..
 
+  cpu.stat
+	読み込み専用のフラットなキーのファイルです。このファイルは
+	root 以外の cgroup に存在します。
+
+	常に、次の 3 つの統計値をレポートします:
+
+	- usage_usec
+	- user_usec
+	- system_usec
+
+	そして、次の 3 つは、コントローラーが有効になった時からレポー
+	トします:
+
+	- nr_periods
+	- nr_throttled
+	- throttled_usec
+
+..
   cpu.weight
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "100".
 
 	The weight in the range [1, 10000].
+..
+
+  cpu.weight
+
+	読み書き可能な単一の値が書かれたファイルです。root 以外の
+	cgroup に存在します。デフォルトは "100" です。
+
+	weight の範囲は [1, 10000] です。
 
   cpu.weight.nice
 	A read-write single value file which exists on non-root
@@ -1707,6 +1756,7 @@ All time durations are in microseconds.
 	granularity is coarser for the nice values, the read value is
 	the closest approximation of the current weight.
 
+..
   cpu.max
 	A read-write two value file which exists on non-root cgroups.
 	The default is "max 100000".
@@ -1718,7 +1768,20 @@ All time durations are in microseconds.
 	which indicates that the group may consume upto $MAX in each
 	$PERIOD duration.  "max" for $MAX indicates no limit.  If only
 	one number is written, $MAX is updated.
+..
 
+  cpu.max
+	読み書き可能な 2 つの値が書かれたファイルです。root 以外の
+	cgroup に存在します。デフォルトは "max 100000" です。
+
+	バンド幅の最大値で、以下のようなフォーマットです。::
+
+	  $MAX $PERIOD
+
+	これは、このグループは $PERIOD の間に最大 $MAX までリソースを
+	消費できることを示します。$MAX の値が "max" である場合は無制限
+	であることを示します。値をひとつだけ書き込んだ場合は $MAX が更
+	新されます。
 
 Memory
 ------
