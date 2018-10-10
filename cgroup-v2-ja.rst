@@ -2435,6 +2435,7 @@ IOインターフェースファイル
 	  8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353
 	  8:0 rbytes=90430464 wbytes=299008000 rios=8950 wios=1252
 
+..
   io.weight
 	A read-write flat-keyed file which exists on non-root cgroups.
 	The default is "default 100".
@@ -2454,7 +2455,28 @@ IOインターフェースファイル
 	  default 100
 	  8:16 200
 	  8:0 50
+..
 
+  io.weight
+	読み書き可能なフラットキーなファイルです。ルート以外の cgroup
+	に存在します。デフォルトは "default 100" です。
+
+	1 行目は特に指定しないデバイスに対して適用されるデフォルトのウェ
+	イトです。残りの行はデバイス番号 $MAJ:$MIN をキーに持つデバイ
+	スの値で、順番には並んでいません。ウェイトは [1, 10000] の範囲
+	で、cgroup が他のデバイスと比較して使える IO 時間の相対的な量
+	を定義します。
+
+	デフォルトウェイトは "default $WEIGHT" もしくは単に "$WEIGHT"
+	を書き込んで更新できます。
+
+	ファイルを読み込んだ際の例は以下のようになります。::
+
+	  default 100
+	  8:16 200
+	  8:0 50
+
+..
   io.max
 	A read-write nested-keyed file which exists on non-root
 	cgroups.
@@ -2493,7 +2515,46 @@ IOインターフェースファイル
 	Reading now returns the following::
 
 	  8:16 rbps=2097152 wbps=max riops=max wiops=max
+..
 
+  io.max
+	読み書き可能なネストしたキーのファイルです。ルート以外の
+	cgroup に存在します。
+
+	IO 制限をベースにした BPS と IOPS です。行はデバイス番号
+	$MAJ:$MIN がキーになっており、順番には並んでいません。以下のネ
+	ストしたキーが定義されています。
+
+	  =====		==================================
+	  rbps		Max read bytes per second
+	  wbps		Max write bytes per second
+	  riops		Max read IO operations per second
+	  wiops		Max write IO operations per second
+	  =====		==================================
+
+	書き込みの際、任意の数のネストしたキー・値のペアを任意の順番で
+	指定できます。"max" を指定した制限を削除するために指定できます。
+	同じキーを複数回指定した場合の結果は不定です。
+
+	BPS と IOPS は IO の向きそれぞれで計測されます。制限に達した場
+	合、IO は遅延します。一時的なバーストは許されます。
+
+	8:16 に対して、読み込みの制限を 2M BPS に、書き込みの制限を
+	120 IOPS に設定するには::
+
+	  echo "8:16 rbps=2097152 wiops=120" > io.max
+
+	読み込むと以下のように出力されます。::
+
+	  8:16 rbps=2097152 wbps=max riops=max wiops=120
+
+	書き込みの IOPS 制限を削除するには、以下のように書き込みます。::
+
+	  echo "8:16 wiops=max" > io.max
+
+	削除後、読み込むと以下のようになります。::
+
+	  8:16 rbps=2097152 wbps=max riops=max wiops=max
 
 Writeback
 ~~~~~~~~~
