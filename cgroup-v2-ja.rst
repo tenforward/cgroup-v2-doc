@@ -2378,16 +2378,24 @@ CPU インターフェースファイル
 IO
 --
 
-The "io" controller regulates the distribution of IO resources.  This
-controller implements both weight based and absolute bandwidth or IOPS
-limit distribution; however, weight based distribution is available
-only if cfq-iosched is in use and neither scheme is available for
-blk-mq devices.
+..
+  The "io" controller regulates the distribution of IO resources.  This
+  controller implements both weight based and absolute bandwidth or IOPS
+  limit distribution; however, weight based distribution is available
+  only if cfq-iosched is in use and neither scheme is available for
+  blk-mq devices.
+"io" コントローラは IO リソースの分配を調整します。このコントローラで
+はウェイトベースと絶対値での帯域もしくは IOPS 制限での分配の両方が実装
+されています。しかし、ウェイトベースの分配は cfq-iosched が使用中の時
+のみ利用可能であり、両方の方法とも、blk-mq デバイスでは利用できません。
 
+..
+  IO Interface Files
+  ~~~~~~~~~~~~~~~~~~
+IOインターフェースファイル
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-IO Interface Files
-~~~~~~~~~~~~~~~~~~
-
+..
   io.stat
 	A read-only nested-keyed file which exists on non-root
 	cgroups.
@@ -2403,6 +2411,26 @@ IO Interface Files
 	  ======	===================
 
 	An example read output follows:
+
+	  8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353
+	  8:0 rbytes=90430464 wbytes=299008000 rios=8950 wios=1252
+..
+
+  io.stat
+	読み込み専用のネストされたキーのファイル。ルート以外の cgroup
+	に存在します。
+
+	行は $MAJ:$MIN というデバイス番号がキーになっており、順番には
+	並んでいません。以下のネストしたキーが定義されています。
+
+	  ======	===================
+	  rbytes	読み込みバイト数
+	  wbytes	書き込みバイト数
+	  rios		読み込み IO 数
+	  wios		書き込み IO 数
+	  ======	===================
+
+	読み込んだ際の例は以下のようになります。
 
 	  8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353
 	  8:0 rbytes=90430464 wbytes=299008000 rios=8950 wios=1252
