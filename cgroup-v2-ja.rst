@@ -2526,10 +2526,10 @@ IOインターフェースファイル
 	ストしたキーが定義されています。
 
 	  =====		==================================
-	  rbps		Max read bytes per second
-	  wbps		Max write bytes per second
-	  riops		Max read IO operations per second
-	  wiops		Max write IO operations per second
+	  rbps		秒あたりの最大読み込みバイト数
+	  wbps		秒あたりの最大書き込みバイト数
+	  riops		秒あたりの最大読み込み操作回数（IOPS）
+	  wiops		秒あたりの最大書き込み操作会す（IOPS）
 	  =====		==================================
 
 	書き込みの際、任意の数のネストしたキー・値のペアを任意の順番で
