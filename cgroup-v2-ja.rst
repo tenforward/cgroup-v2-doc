@@ -3076,61 +3076,109 @@ Deprecated v1 Core Features
 - /proc/cgroup は v2 では無意味です。root にある "cgroup.controllers"
   ファイルを代わりに使います
 
-Issues with v1 and Rationales for v2
-====================================
+..
+  Issues with v1 and Rationales for v2
+  ====================================
+v1 の問題と v2 の原理
+=====================
+..
+  Multiple Hierarchies
+  --------------------
+複数階層構造
+------------
+..
+  cgroup v1 allowed an arbitrary number of hierarchies and each
+  hierarchy could host any number of controllers.  While this seemed to
+  provide a high level of flexibility, it wasn't useful in practice.
+cgroup v1 では任意の数の階層構造が許されており、それぞれの階層構造は任
+意の数のコントローラを含められました。これは高いレベルでの柔軟性を提供
+しているように見えた一方で、実際には役に立ちませんでした。
 
-Multiple Hierarchies
---------------------
+..
+  For example, as there is only one instance of each controller, utility
+  type controllers such as freezer which can be useful in all
+  hierarchies could only be used in one.  The issue is exacerbated by
+  the fact that controllers couldn't be moved to another hierarchy once
+  hierarchies were populated.  Another issue was that all controllers
+  bound to a hierarchy were forced to have exactly the same view of the
+  hierarchy.  It wasn't possible to vary the granularity depending on
+  the specific controller.
+例えば、それぞれのコントローラはインスタンスがひとつだけですので、
+freezer のようなすべての階層で使えると便利なユーティリティタイプのコン
+トローラがひとつでしか使えませんでした。この問題は、コントローラは一度
+有効化されると、他の階層に移動することができないので深刻です。他の問題
+は、ある階層にバインドされたコントローラはすべて同じ階層構造のビューを
+強制されるということでした。特定のコントローラに応じて粒度を変化させる
+ことができませんでした。
 
-cgroup v1 allowed an arbitrary number of hierarchies and each
-hierarchy could host any number of controllers.  While this seemed to
-provide a high level of flexibility, it wasn't useful in practice.
+..
+  In practice, these issues heavily limited which controllers could be
+  put on the same hierarchy and most configurations resorted to putting
+  each controller on its own hierarchy.  Only closely related ones, such
+  as the cpu and cpuacct controllers, made sense to be put on the same
+  hierarchy.  This often meant that userland ended up managing multiple
+  similar hierarchies repeating the same steps on each hierarchy
+  whenever a hierarchy management operation was necessary.
+実際、これらの問題はどのコントローラを同じ階層に置くかを強く制限しまし
+たし、結局はほとんどの場合、コントローラそれぞれを自身だけが属する階層
+に置くことになりました。cpu と cpuacct コントローラのように、密接に関
+係するコントローラだけが同じ階層に置く意味がありました。このことは、結
+局は階層を管理する操作が必要なときは、常にユーザランドは同じような階層
+を階層ごとに繰り返し同じような操作を行うことになることを意味しました。
 
-For example, as there is only one instance of each controller, utility
-type controllers such as freezer which can be useful in all
-hierarchies could only be used in one.  The issue is exacerbated by
-the fact that controllers couldn't be moved to another hierarchy once
-hierarchies were populated.  Another issue was that all controllers
-bound to a hierarchy were forced to have exactly the same view of the
-hierarchy.  It wasn't possible to vary the granularity depending on
-the specific controller.
+..
+  Furthermore, support for multiple hierarchies came at a steep cost.
+  It greatly complicated cgroup core implementation but more importantly
+  the support for multiple hierarchies restricted how cgroup could be
+  used in general and what controllers was able to do.
+その上、複数階層構造のサポートは法外なコストにつながりました。cgroup
+コアの実装は複雑になりましたが、更に重要なのは、複数階層構造のサポート
+が一般的な cgroup の使われ方の可能性を制限し、コントローラができること
+を制限しました。
 
-In practice, these issues heavily limited which controllers could be
-put on the same hierarchy and most configurations resorted to putting
-each controller on its own hierarchy.  Only closely related ones, such
-as the cpu and cpuacct controllers, made sense to be put on the same
-hierarchy.  This often meant that userland ended up managing multiple
-similar hierarchies repeating the same steps on each hierarchy
-whenever a hierarchy management operation was necessary.
+..
+  There was no limit on how many hierarchies there might be, which meant
+  that a thread's cgroup membership couldn't be described in finite
+  length.  The key might contain any number of entries and was unlimited
+  in length, which made it highly awkward to manipulate and led to
+  addition of controllers which existed only to identify membership,
+  which in turn exacerbated the original problem of proliferating number
+  of hierarchies.
+何階層存在する可能性があるのかの制限はありませんでした。これはスレッド
+の cgroup のメンバーシップが有限の長さで記述できないことを意味しました。
+ここでのキーは、任意の数のエントリが含まれ、長さに制限がないことで、こ
+れは操作をひどく扱いにくくし、メンバーシップを識別するためだけに存在す
+るコントローラの追加につながり、巡り巡って急増する階層数という元の問題
+をより悪化させるものでした。
 
-Furthermore, support for multiple hierarchies came at a steep cost.
-It greatly complicated cgroup core implementation but more importantly
-the support for multiple hierarchies restricted how cgroup could be
-used in general and what controllers was able to do.
+..
+  Also, as a controller couldn't have any expectation regarding the
+  topologies of hierarchies other controllers might be on, each
+  controller had to assume that all other controllers were attached to
+  completely orthogonal hierarchies.  This made it impossible, or at
+  least very cumbersome, for controllers to cooperate with each other.
+加えて、あるコントローラは他のコントローラがどのようなトポロジになるの
+かを全く予想できないので、他のコントローラがそれぞれ完全に直交する階層
+の上で操作されることを仮定しなければなりませんでした。コントローラがお
+互いに協調して動作するには、これは不可能であるか、少なくとも非常に負荷
+が大きくります。
 
-There was no limit on how many hierarchies there might be, which meant
-that a thread's cgroup membership couldn't be described in finite
-length.  The key might contain any number of entries and was unlimited
-in length, which made it highly awkward to manipulate and led to
-addition of controllers which existed only to identify membership,
-which in turn exacerbated the original problem of proliferating number
-of hierarchies.
-
-Also, as a controller couldn't have any expectation regarding the
-topologies of hierarchies other controllers might be on, each
-controller had to assume that all other controllers were attached to
-completely orthogonal hierarchies.  This made it impossible, or at
-least very cumbersome, for controllers to cooperate with each other.
-
-In most use cases, putting controllers on hierarchies which are
-completely orthogonal to each other isn't necessary.  What usually is
-called for is the ability to have differing levels of granularity
-depending on the specific controller.  In other words, hierarchy may
-be collapsed from leaf towards root when viewed from specific
-controllers.  For example, a given configuration might not care about
-how memory is distributed beyond a certain level while still wanting
-to control how CPU cycles are distributed.
-
+..
+  In most use cases, putting controllers on hierarchies which are
+  completely orthogonal to each other isn't necessary.  What usually is
+  called for is the ability to have differing levels of granularity
+  depending on the specific controller.  In other words, hierarchy may
+  be collapsed from leaf towards root when viewed from specific
+  controllers.  For example, a given configuration might not care about
+  how memory is distributed beyond a certain level while still wanting
+  to control how CPU cycles are distributed.
+ユースケースのほとんどでは、お互い完全に直交している階層構造にコントロー
+ラを置く必要はありません。通常求められているものは、特定のコントローラ
+に依存する異なる粒度のレベルを持つ能力です。言い換えると、階層は特定の
+コントローラの視点から見た時、末端からルートに向かって崩壊していくかも
+しれないということです。例えば、与えられた設定では、あるレベルを超えて
+メモリを配分するかについては設定されないかもしれないが、CPU サイクルの
+分配はコントロールしたいかもしれないというような事です。
 
 Thread Granularity
 ------------------
