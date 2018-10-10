@@ -3053,18 +3053,28 @@ bio_associate_blkcg() を直接使用して、特有の問題のケースを回�
 
 Deprecated v1 Core Features
 ===========================
+..
+  - Multiple hierarchies including named ones are not supported.
+- 名前付きの階層を含む複数階層構造はサポートされません 
 
-- Multiple hierarchies including named ones are not supported.
+..
+  - All v1 mount options are not supported.
+- 一切の v1 のマウントオプションはサポートされません
 
-- All v1 mount options are not supported.
+..
+  - The "tasks" file is removed and "cgroup.procs" is not sorted.
+- "tasks" ファイルは削除され、"cgroup.procs" ファイルはソートされませ
+  ん
 
-- The "tasks" file is removed and "cgroup.procs" is not sorted.
+..
+  - "cgroup.clone_children" is removed.
+- "cgroup.clone_children" は削除されました
 
-- "cgroup.clone_children" is removed.
-
-- /proc/cgroups is meaningless for v2.  Use "cgroup.controllers" file
-  at the root instead.
-
+..
+  - /proc/cgroups is meaningless for v2.  Use "cgroup.controllers" file
+    at the root instead.
+- /proc/cgroup は v2 では無意味です。root にある "cgroup.controllers"
+  ファイルを代わりに使います
 
 Issues with v1 and Rationales for v2
 ====================================
