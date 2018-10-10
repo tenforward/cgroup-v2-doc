@@ -2966,46 +2966,89 @@ The virtualization of /proc/self/cgroup file combined with restricting
 the view of cgroup hierarchy by namespace-private cgroupfs mount
 provides a properly isolated cgroup view inside the container.
 
+..
+  Information on Kernel Programming
+  =================================
+カーネルプログラミングの情報
+============================
+..
+  This section contains kernel programming information in the areas
+  where interacting with cgroup is necessary.  cgroup core and
+  controllers are not covered.
 
-Information on Kernel Programming
-=================================
+このセクションは cgroup と情報をやりとりする必要のある分野のカーネルの
+プログラミング情報について記載します。cgroup core とコントローラについ
+ては含みません。
 
-This section contains kernel programming information in the areas
-where interacting with cgroup is necessary.  cgroup core and
-controllers are not covered.
+..
+  Filesystem Support for Writeback
+  --------------------------------
+ライトバックに対するファイルシステムサポート
+-------------------------------------------
 
+..
+  A filesystem can support cgroup writeback by updating
+  address_space_operations->writepage[s]() to annotate bio's using the
+  following two functions.
 
-Filesystem Support for Writeback
---------------------------------
+ファイルシステムは、以下の 2 つの関数を使って bio をアノテートするため
+に address_space_operations->writepage[s]() を更新することで cgroup
+の writeback をサポートできます。
 
-A filesystem can support cgroup writeback by updating
-address_space_operations->writepage[s]() to annotate bio's using the
-following two functions.
-
+..
   wbc_init_bio(@wbc, @bio)
 	Should be called for each bio carrying writeback data and
 	associates the bio with the inode's owner cgroup.  Can be
 	called anytime between bio allocation and submission.
+..
 
+  wbc_init_bio(@wbc, @bio)
+	bio それぞれがライトバックデータを運ぶために呼び出されます。そ
+	して、inode のオーナーである cgroup と bio を結びつけます。bio
+	のアロケーションとサブミッション (提出) の間いつでも呼び出せま
+	す。
+
+..
   wbc_account_io(@wbc, @page, @bytes)
 	Should be called for each data segment being written out.
 	While this function doesn't care exactly when it's called
 	during the writeback session, it's the easiest and most
 	natural to call it as data segments are added to a bio.
+..
 
-With writeback bio's annotated, cgroup support can be enabled per
-super_block by setting SB_I_CGROUPWB in ->s_iflags.  This allows for
-selective disabling of cgroup writeback support which is helpful when
-certain filesystem features, e.g. journaled data mode, are
-incompatible.
+  wbc_account_io(@wbc, @page, @bytes)
+	各データセグメントが書き出されるたびに呼び出します。この関数は
+	ライトバックセッションのいつ呼び出されるか正確には気にしませんが、
+	データセグメントが bio に追加されるときに呼び出すのがもっとも
+	簡単で自然です。
 
-wbc_init_bio() binds the specified bio to its cgroup.  Depending on
-the configuration, the bio may be executed at a lower priority and if
-the writeback session is holding shared resources, e.g. a journal
-entry, may lead to priority inversion.  There is no one easy solution
-for the problem.  Filesystems can try to work around specific problem
-cases by skipping wbc_init_bio() or using bio_associate_blkcg()
-directly.
+..
+  With writeback bio's annotated, cgroup support can be enabled per
+  super_block by setting SB_I_CGROUPWB in ->s_iflags.  This allows for
+  selective disabling of cgroup writeback support which is helpful when
+  certain filesystem features, e.g. journaled data mode, are
+  incompatible.
+writeback bio がアノテートされると、SB_I_CGROUPWB が -> s_iflags
+に設定されることでスーパーブロックごとにcgroup サポートが有効になりま
+す。このことにより、cgroup writeback サポートの選択的に無効化できます。
+これは、ファイルシステムの特定の機能 (e.g. journaled data mode) に互換
+性がない場合に役立ちます。
+
+..
+  wbc_init_bio() binds the specified bio to its cgroup.  Depending on
+  the configuration, the bio may be executed at a lower priority and if
+  the writeback session is holding shared resources, e.g. a journal
+  entry, may lead to priority inversion.  There is no one easy solution
+  for the problem.  Filesystems can try to work around specific problem
+  cases by skipping wbc_init_bio() or using bio_associate_blkcg()
+  directly.
+wbc_init_bio() は指定した bio をその cgroup に結びつけます。設定に依
+存して、bio は低い優先度で実行されるかもしれません。そして writeback
+セッションが共有リソースに縛り付けられた場合 (e.g. a journal entry)、
+優先度が逆転するかもしれません。この問題を解決する簡単な方法はありませ
+ん。ファイルシステムは wbc_init_bio() をスキップするか、
+bio_associate_blkcg() を直接使用して、特有の問題のケースを回避しよう
+とすることができます。
 
 
 Deprecated v1 Core Features
