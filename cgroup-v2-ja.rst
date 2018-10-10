@@ -2556,65 +2556,124 @@ IOインターフェースファイル
 
 	  8:16 rbps=2097152 wbps=max riops=max wiops=max
 
-Writeback
-~~~~~~~~~
+..
+  Writeback
+  ~~~~~~~~~
+ライトバック
+~~~~~~~~~~~~
 
-Page cache is dirtied through buffered writes and shared mmaps and
-written asynchronously to the backing filesystem by the writeback
-mechanism.  Writeback sits between the memory and IO domains and
-regulates the proportion of dirty memory by balancing dirtying and
-write IOs.
+..
+  Page cache is dirtied through buffered writes and shared mmaps and
+  written asynchronously to the backing filesystem by the writeback
+  mechanism.  Writeback sits between the memory and IO domains and
+  regulates the proportion of dirty memory by balancing dirtying and
+  write IOs.
+ページキャッシュはバッファードライトとシェアード mmap を通して dirty
+になります。そしてライトバックのメカニズムによってファイルシステムに非
+同期に書き込まれます。ライトバックはメモリと IO の領域の間に存在します。
+そして、dirty とマークする処理と書き込み IO の間でバランスを取りながら、
+dirty メモリの割合を調節します。
 
-The io controller, in conjunction with the memory controller,
-implements control of page cache writeback IOs.  The memory controller
-defines the memory domain that dirty memory ratio is calculated and
-maintained for and the io controller defines the io domain which
-writes out dirty pages for the memory domain.  Both system-wide and
-per-cgroup dirty memory states are examined and the more restrictive
-of the two is enforced.
+..
+  The io controller, in conjunction with the memory controller,
+  implements control of page cache writeback IOs.  The memory controller
+  defines the memory domain that dirty memory ratio is calculated and
+  maintained for and the io controller defines the io domain which
+  writes out dirty pages for the memory domain.  Both system-wide and
+  per-cgroup dirty memory states are examined and the more restrictive
+  of the two is enforced.
+メモリコントローラと協力して、io コントローラはページキャッシュのライ
+トバック IO のコントロールを実装しています。メモリコントローラは、
+dirty なメモリの割合を計算し、維持を行うメモリ領域を定義します。そして、
+io コントローラはメモリ領域から dirty なページを書き出す io 領域を定義
+します。
 
-cgroup writeback requires explicit support from the underlying
-filesystem.  Currently, cgroup writeback is implemented on ext2, ext4
-and btrfs.  On other filesystems, all writeback IOs are attributed to
-the root cgroup.
+..
+  cgroup writeback requires explicit support from the underlying
+  filesystem.  Currently, cgroup writeback is implemented on ext2, ext4
+  and btrfs.  On other filesystems, all writeback IOs are attributed to
+  the root cgroup.
+cgroup のライトバックは、使用するファイルシステムのサポートが必ず必要
+です。現時点では、cgroup ライトバックは ext2、ext4、btrfs に実装されて
+います。他のファイルシステムでは、すべてのライトバック IO は root
+cgroup に属します。
 
-There are inherent differences in memory and writeback management
-which affects how cgroup ownership is tracked.  Memory is tracked per
-page while writeback per inode.  For the purpose of writeback, an
-inode is assigned to a cgroup and all IO requests to write dirty pages
-from the inode are attributed to that cgroup.
+..
+  There are inherent differences in memory and writeback management
+  which affects how cgroup ownership is tracked.  Memory is tracked per
+  page while writeback per inode.  For the purpose of writeback, an
+  inode is assigned to a cgroup and all IO requests to write dirty pages
+  from the inode are attributed to that cgroup.
+どのように cgroup への所属がトラッキングされるかに影響する、メモリとラ
+イトバックの管理の固有の違いがあります。ライトバックは inode ごとです
+が、メモリはページごとにトラッキングされます。ライトバックの目的のため
+に、inode は cgroup にアサインされます。inode から dirty ページを書き
+込むための IO リクエストは、その cgroup に所属します。
 
-As cgroup ownership for memory is tracked per page, there can be pages
-which are associated with different cgroups than the one the inode is
-associated with.  These are called foreign pages.  The writeback
-constantly keeps track of foreign pages and, if a particular foreign
-cgroup becomes the majority over a certain period of time, switches
-the ownership of the inode to that cgroup.
+..
+  As cgroup ownership for memory is tracked per page, there can be pages
+  which are associated with different cgroups than the one the inode is
+  associated with.  These are called foreign pages.  The writeback
+  constantly keeps track of foreign pages and, if a particular foreign
+  cgroup becomes the majority over a certain period of time, switches
+  the ownership of the inode to that cgroup.
+メモリに対する cgroup の所有権はページごとにトラッキングされるので、
+inode が関連付けられている cgroup とは違う cgroup に関連付けられている
+ページもありえます。これらは foreign ページと呼ばれます。ライトバック
+は常に foreign ページをトラックし続けます。そして、もし特定の外部
+cgroup がある一定期間多数派になった場合、その cgroup に対する inode の
+所有権が変わるでしょう。
 
-While this model is enough for most use cases where a given inode is
-mostly dirtied by a single cgroup even when the main writing cgroup
-changes over time, use cases where multiple cgroups write to a single
-inode simultaneously are not supported well.  In such circumstances, a
-significant portion of IOs are likely to be attributed incorrectly.
-As memory controller assigns page ownership on the first use and
-doesn't update it until the page is released, even if writeback
-strictly follows page ownership, multiple cgroups dirtying overlapping
-areas wouldn't work as expected.  It's recommended to avoid such usage
-patterns.
+..
+  While this model is enough for most use cases where a given inode is
+  mostly dirtied by a single cgroup even when the main writing cgroup
+  changes over time, use cases where multiple cgroups write to a single
+  inode simultaneously are not supported well.  In such circumstances, a
+  significant portion of IOs are likely to be attributed incorrectly.
+  As memory controller assigns page ownership on the first use and
+  doesn't update it until the page is released, even if writeback
+  strictly follows page ownership, multiple cgroups dirtying overlapping
+  areas wouldn't work as expected.  It's recommended to avoid such usage
+  patterns.
+このモデルは与えられた inode がほとんど単一の cgroup によって dirty と
+なるようなほとんどのユースケースだけでなく、メインの書き込み cgroup が
+時間とともに変化していく場合でも十分な一方、複数の cgroup が単一の
+inode にいっせいに書き込みにいくようなユースケースは十分にサポートでき
+ません。このような環境下では、IO の重要な部分が正しく所属できなさそう
+です。メモリコントローラは最初に使ったものにページの所有権を割り当て、
+ページが解放されるまで所有権を更新しないので、複数の cgroup の dirty
+がオーバラップするエリアでは、期待通り動作しないでしょう。このような使
+用パターンは避けることを推奨します。
 
-The sysctl knobs which affect writeback behavior are applied to cgroup
-writeback as follows.
+..
+  The sysctl knobs which affect writeback behavior are applied to cgroup
+  writeback as follows.
+ライトバックに影響を与える sysctl 設定は cgroup の writeback に以下の
+ように適用されます。
 
+..
   vm.dirty_background_ratio, vm.dirty_ratio
 	These ratios apply the same to cgroup writeback with the
 	amount of available memory capped by limits imposed by the
 	memory controller and system-wide clean memory.
+..
 
+  vm.dirty_background_ratio, vm.dirty_ratio
+	これらの ratio は、メモリコントローラとシステムワイドのクリー
+	ンなメモリによって課せられる制限によって制限される利用可能なメ
+	モリ量の cgroup ライトバックに対して同じものが適用されます。
+
+..
   vm.dirty_background_bytes, vm.dirty_bytes
 	For cgroup writeback, this is calculated into ratio against
 	total available memory and applied the same way as
 	vm.dirty[_background]_ratio.
+..
 
+  vm.dirty_background_bytes, vm.dirty_bytes
+	cgroup ライトバックの場合、これは利用可能なメモリの総量に対す
+	る割合に計算されます。そして、vm.dirty[_background]_ratio と同
+	様の方法で適用されます。
 
 PID
 ---
