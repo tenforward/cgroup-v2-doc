@@ -3055,24 +3055,26 @@ Deprecated v1 Core Features
 ===========================
 ..
   - Multiple hierarchies including named ones are not supported.
-- 名前付きの階層を含む複数階層構造はサポートされません 
 
-..
   - All v1 mount options are not supported.
+
+  - The "tasks" file is removed and "cgroup.procs" is not sorted.
+
+  - "cgroup.clone_children" is removed.
+
+  - /proc/cgroups is meaningless for v2.  Use "cgroup.controllers" file
+    at the root instead.
+..
+
+- 名前付きの階層を含む複数階層構造はサポートされません
+
 - 一切の v1 のマウントオプションはサポートされません
 
-..
-  - The "tasks" file is removed and "cgroup.procs" is not sorted.
 - "tasks" ファイルは削除され、"cgroup.procs" ファイルはソートされませ
   ん
 
-..
-  - "cgroup.clone_children" is removed.
 - "cgroup.clone_children" は削除されました
 
-..
-  - /proc/cgroups is meaningless for v2.  Use "cgroup.controllers" file
-    at the root instead.
 - /proc/cgroup は v2 では無意味です。root にある "cgroup.controllers"
   ファイルを代わりに使います
 
