@@ -3182,163 +3182,305 @@ freezer のようなすべての階層で使えると便利なユーティリテ
 メモリを配分するかについては設定されないかもしれないが、CPU サイクルの
 分配はコントロールしたいかもしれないというような事です。
 
-Thread Granularity
-------------------
+..
+  Thread Granularity
+  ------------------
+スレッドの粒度
+--------------
+..
+  cgroup v1 allowed threads of a process to belong to different cgroups.
+  This didn't make sense for some controllers and those controllers
+  ended up implementing different ways to ignore such situations but
+  much more importantly it blurred the line between API exposed to
+  individual applications and system management interface.
+cgroup v1 はプロセスのスレッドが異なる cgroup に属せました。コントロー
+ラによってはこれは意味がありませんでした。これらのコントローラでは色々
+な方法でこの状況を無視する方法を実装しましたが、さらに重要なことには、
+これはそれぞれのアプリケーションに提供される API とシステム管理インター
+フェースの間の境界を曖昧にしました。
 
-cgroup v1 allowed threads of a process to belong to different cgroups.
-This didn't make sense for some controllers and those controllers
-ended up implementing different ways to ignore such situations but
-much more importantly it blurred the line between API exposed to
-individual applications and system management interface.
+..
+  Generally, in-process knowledge is available only to the process
+  itself; thus, unlike service-level organization of processes,
+  categorizing threads of a process requires active participation from
+  the application which owns the target process.
+一般的に、プロセス内の情報はプロセス自身のみが利用可能です。それゆえ、
+プロセスのサービスレベルの集合と違って、プロセスのスレッドをカテゴライ
+ズするには、ターゲットとなるプロセスを所有するアプリケーションからの積
+極的な関与が必要です。
 
-Generally, in-process knowledge is available only to the process
-itself; thus, unlike service-level organization of processes,
-categorizing threads of a process requires active participation from
-the application which owns the target process.
+..
+  cgroup v1 had an ambiguously defined delegation model which got abused
+  in combination with thread granularity.  cgroups were delegated to
+  individual applications so that they can create and manage their own
+  sub-hierarchies and control resource distributions along them.  This
+  effectively raised cgroup to the status of a syscall-like API exposed
+  to lay programs.
+cgroup v1 は、スレッドの粒度との組み合わせで濫用があった、曖昧に定義さ
+れた委任モデルを持っていました。cgroup は、個別のアプリケーションが自
+身のサブ階層を作り管理し、その階層間でのリソース分配をコントロールでき
+るように、個々のアプリケーションに権限委譲されていました。このことが、
+プログラムに対して提供されるシステムコール風の API のステータスへと
+cgroupを効果的に高めました。
 
-cgroup v1 had an ambiguously defined delegation model which got abused
-in combination with thread granularity.  cgroups were delegated to
-individual applications so that they can create and manage their own
-sub-hierarchies and control resource distributions along them.  This
-effectively raised cgroup to the status of a syscall-like API exposed
-to lay programs.
+..
+  First of all, cgroup has a fundamentally inadequate interface to be
+  exposed this way.  For a process to access its own knobs, it has to
+  extract the path on the target hierarchy from /proc/self/cgroup,
+  construct the path by appending the name of the knob to the path, open
+  and then read and/or write to it.  This is not only extremely clunky
+  and unusual but also inherently racy.  There is no conventional way to
+  define transaction across the required steps and nothing can guarantee
+  that the process would actually be operating on its own sub-hierarchy.
+まず第一に、基本的には cgroup はこのように提供される不適切なインター
+フェースを持っています。プロセスが自身の調整ノブへアクセスするために、
+/proc/self/cgroup から得られるターゲットのパスを展開し、調整ノブの名前
+をパスに追加してパス名を構築し、オープンし、それからそれに対して読み書
+きをする必要があります。これはとても格好悪く、一般的ではないだけでなく、
+本質的に下品です。必要とするステップにわたってトランザクションを定義す
+るための従来のような方法がなく、プロセスが実際に自身のサブ階層上で操作
+されることを保証するものは何もありません。
 
-First of all, cgroup has a fundamentally inadequate interface to be
-exposed this way.  For a process to access its own knobs, it has to
-extract the path on the target hierarchy from /proc/self/cgroup,
-construct the path by appending the name of the knob to the path, open
-and then read and/or write to it.  This is not only extremely clunky
-and unusual but also inherently racy.  There is no conventional way to
-define transaction across the required steps and nothing can guarantee
-that the process would actually be operating on its own sub-hierarchy.
+..
+  cgroup controllers implemented a number of knobs which would never be
+  accepted as public APIs because they were just adding control knobs to
+  system-management pseudo filesystem.  cgroup ended up with interface
+  knobs which were not properly abstracted or refined and directly
+  revealed kernel internal details.  These knobs got exposed to
+  individual applications through the ill-defined delegation mechanism
+  effectively abusing cgroup as a shortcut to implementing public APIs
+  without going through the required scrutiny.
+cgroup コントローラは公開 API としては決して受け入れられない多数の調整
+ノブを実装しました。なぜなら、それらは単にシステム管理の擬似ファイルシ
+ステムに対する調整ノブを追加するだけだったからです。cgroup は、適切に
+抽象化されたり改良されない、カーネルの内部の詳細を直接露呈するものになっ
+てしまいました。これらの調整ノブは、必要な精査を受けることなく、cgroup
+を公開API を実装するショートカットとして乱用する、不適切に定義された委
+任メカニズムを通して個々のアプリケーションに晒されます。
 
-cgroup controllers implemented a number of knobs which would never be
-accepted as public APIs because they were just adding control knobs to
-system-management pseudo filesystem.  cgroup ended up with interface
-knobs which were not properly abstracted or refined and directly
-revealed kernel internal details.  These knobs got exposed to
-individual applications through the ill-defined delegation mechanism
-effectively abusing cgroup as a shortcut to implementing public APIs
-without going through the required scrutiny.
+..
+  This was painful for both userland and kernel.  Userland ended up with
+  misbehaving and poorly abstracted interfaces and kernel exposing and
+  locked into constructs inadvertently.
+これはユーザランドとカーネル両方にとってつらいものでした。ユーザランド
+は誤った振る舞いをするようになり、貧弱に抽象化されたインターフェースと
+カーネルは不注意に構築されたものにロックされ、さらされています。
 
-This was painful for both userland and kernel.  Userland ended up with
-misbehaving and poorly abstracted interfaces and kernel exposing and
-locked into constructs inadvertently.
+..
+  Competition Between Inner Nodes and Threads
+  -------------------------------------------
+内部ノードとスレッドの競合
+--------------------------
+..
+  cgroup v1 allowed threads to be in any cgroups which created an
+  interesting problem where threads belonging to a parent cgroup and its
+  children cgroups competed for resources.  This was nasty as two
+  different types of entities competed and there was no obvious way to
+  settle it.  Different controllers did different things.
+cgroup v1 は任意の cgroup にスレッドが所属できました。これは親の
+cgroup とその子の cgroup に属するスレッドがリソースを争うところで興味
+深い問題を作り出しました。ふたつの異なるタイプのエンティティが競合し、
+それを解決するための明確な方法がなかったので、これは厄介な問題でした。
+コントローラが異なると違うことをやっていました。
 
+..
+  The cpu controller considered threads and cgroups as equivalents and
+  mapped nice levels to cgroup weights.  This worked for some cases but
+  fell flat when children wanted to be allocated specific ratios of CPU
+  cycles and the number of internal threads fluctuated - the ratios
+  constantly changed as the number of competing entities fluctuated.
+  There also were other issues.  The mapping from nice level to weight
+  wasn't obvious or universal, and there were various other knobs which
+  simply weren't available for threads.
+CPU コントローラはスレッドと cgroup を等価に扱い、nice レベルを cgroup
+ウェイトにマッピングしました。これで働くケースもありましたが、子どもが
+CPU サイクルの特定の割合の割り当てを要求し、内部スレッドの数が上下する
+とき、つまり競合するエンティティの数が上下するので割合が常に変化する場
+合にはうまくいきませんでした。
 
-Competition Between Inner Nodes and Threads
--------------------------------------------
+..
+  The io controller implicitly created a hidden leaf node for each
+  cgroup to host the threads.  The hidden leaf had its own copies of all
+  the knobs with ``leaf_`` prefixed.  While this allowed equivalent
+  control over internal threads, it was with serious drawbacks.  It
+  always added an extra layer of nesting which wouldn't be necessary
+  otherwise, made the interface messy and significantly complicated the
+  implementation.
+IO コントローラは、スレッドを扱うために cgroup それぞれに隠れたリーフ
+ノードを暗黙のうちに作成します。この隠れたリーフは自身のコピーとして、
+頭に "leaf_" と付いた全てのノブを持ちます。これは同等のコントロールが
+内部タスクにも可能になりますが、重大な欠点も持ちます。そうでなければ常
+に必要ではないかもしれないネストした余分なレイヤーを追加し、インター
+フェースを乱雑にして、実装をかなり複雑にします。
 
-cgroup v1 allowed threads to be in any cgroups which created an
-interesting problem where threads belonging to a parent cgroup and its
-children cgroups competed for resources.  This was nasty as two
-different types of entities competed and there was no obvious way to
-settle it.  Different controllers did different things.
+..
+  The memory controller didn't have a way to control what happened
+  between internal tasks and child cgroups and the behavior was not
+  clearly defined.  There were attempts to add ad-hoc behaviors and
+  knobs to tailor the behavior to specific workloads which would have
+  led to problems extremely difficult to resolve in the long term.
+メモリコントローラは内部タスクと子cgroup間で起こっていることをコントロー
+ルする方法がありませんでした。そして、振る舞いが明確には定義されていま
+せんでした。この方向性を続けることは長期間に渡って解決が非常に難しい
+問題を引き起こすであろう、特定の作業に振る舞いを合わせるためのアドホッ
+クな振る舞いとノブが追加される試みがありました。
 
-The cpu controller considered threads and cgroups as equivalents and
-mapped nice levels to cgroup weights.  This worked for some cases but
-fell flat when children wanted to be allocated specific ratios of CPU
-cycles and the number of internal threads fluctuated - the ratios
-constantly changed as the number of competing entities fluctuated.
-There also were other issues.  The mapping from nice level to weight
-wasn't obvious or universal, and there were various other knobs which
-simply weren't available for threads.
+..
+  Multiple controllers struggled with internal tasks and came up with
+  different ways to deal with it; unfortunately, all the approaches were
+  severely flawed and, furthermore, the widely different behaviors
+  made cgroup as a whole highly inconsistent.
+複数のコントローラが内部タスクと奮闘していました。そして、それを解決す
+る色々な方法を考えだしてきました。不幸にも、全てのアプローチは重大な欠
+点がありました。その上、非常に異なった振る舞いが cgroup 全体を完全に一
+貫性のないものにしている。
 
-The io controller implicitly created a hidden leaf node for each
-cgroup to host the threads.  The hidden leaf had its own copies of all
-the knobs with ``leaf_`` prefixed.  While this allowed equivalent
-control over internal threads, it was with serious drawbacks.  It
-always added an extra layer of nesting which wouldn't be necessary
-otherwise, made the interface messy and significantly complicated the
-implementation.
+..
+  This clearly is a problem which needs to be addressed from cgroup core
+  in a uniform way.
+これは明らかに、統一された方法で cgroup コアから対処する必要がある問題です。
 
-The memory controller didn't have a way to control what happened
-between internal tasks and child cgroups and the behavior was not
-clearly defined.  There were attempts to add ad-hoc behaviors and
-knobs to tailor the behavior to specific workloads which would have
-led to problems extremely difficult to resolve in the long term.
+..
+  Other Interface Issues
+  ----------------------
+他のインターフェースの問題
+----------------------------
+..
+  cgroup v1 grew without oversight and developed a large number of
+  idiosyncrasies and inconsistencies.  One issue on the cgroup core side
+  was how an empty cgroup was notified - a userland helper binary was
+  forked and executed for each event.  The event delivery wasn't
+  recursive or delegatable.  The limitations of the mechanism also led
+  to in-kernel event delivery filtering mechanism further complicating
+  the interface.
+cgroup v1 は管理がないまま進化し、多数の独自性と矛盾が明らかになりまし
+た。cgroup コア側にある問題のひとつは、空の cgroup を通知する方法でし
+た。それは、ユーザーランドのヘルパーバイナリが起動され、イベントごとに
+実行されました。このイベントは再帰的でも委任可能でもありませんでした。
+メカニズムの制限は、カーネル内のイベント配送のフィルタリングメカニズム
+をより複雑なインターフェースにした。
 
-Multiple controllers struggled with internal tasks and came up with
-different ways to deal with it; unfortunately, all the approaches were
-severely flawed and, furthermore, the widely different behaviors
-made cgroup as a whole highly inconsistent.
+..
+  Controller interfaces were problematic too.  An extreme example is
+  controllers completely ignoring hierarchical organization and treating
+  all cgroups as if they were all located directly under the root
+  cgroup.  Some controllers exposed a large amount of inconsistent
+  implementation details to userland.
+コントローラインターフェースにも問題がありました。極端な例は、階層構造
+を完全に無視し、すべての cgroup が root cgroup 直下にあるように扱うコ
+ントローラです。大量の一貫性のない実装を大量にユーザランドにさらしてい
+るコントローラもありました。
 
-This clearly is a problem which needs to be addressed from cgroup core
-in a uniform way.
+..
+  There also was no consistency across controllers.  When a new cgroup
+  was created, some controllers defaulted to not imposing extra
+  restrictions while others disallowed any resource usage until
+  explicitly configured.  Configuration knobs for the same type of
+  control used widely differing naming schemes and formats.  Statistics
+  and information knobs were named arbitrarily and used different
+  formats and units even in the same controller.
+oコントローラ間の一貫性のなさもありました。新しい cgroup が作られたとき、
+特に制限がかからないコントローラもあれば、明示的に設定されるまではリソー
+スが使えないコントローラもありました。同じタイプのコントロールをするた
+めの設定ノブは、異なるネーミングスキームとフォーマットで広く使われてい
+ます。統計や情報を表示するノブは任意の名前が付けられ、同じコントローラ
+内でさえ異なるフォーマットと単位が用いられたりしました。
 
+..
+  cgroup v2 establishes common conventions where appropriate and updates
+  controllers so that they expose minimal and consistent interfaces.
+cgroup v2 では必要に応じて共通の規約が確立され、最小限の一貫性あるイン
+ターフェースが提供されるようにコントローラが更新されます。
 
-Other Interface Issues
-----------------------
-
-cgroup v1 grew without oversight and developed a large number of
-idiosyncrasies and inconsistencies.  One issue on the cgroup core side
-was how an empty cgroup was notified - a userland helper binary was
-forked and executed for each event.  The event delivery wasn't
-recursive or delegatable.  The limitations of the mechanism also led
-to in-kernel event delivery filtering mechanism further complicating
-the interface.
-
-Controller interfaces were problematic too.  An extreme example is
-controllers completely ignoring hierarchical organization and treating
-all cgroups as if they were all located directly under the root
-cgroup.  Some controllers exposed a large amount of inconsistent
-implementation details to userland.
-
-There also was no consistency across controllers.  When a new cgroup
-was created, some controllers defaulted to not imposing extra
-restrictions while others disallowed any resource usage until
-explicitly configured.  Configuration knobs for the same type of
-control used widely differing naming schemes and formats.  Statistics
-and information knobs were named arbitrarily and used different
-formats and units even in the same controller.
-
-cgroup v2 establishes common conventions where appropriate and updates
-controllers so that they expose minimal and consistent interfaces.
-
-
-Controller Issues and Remedies
-------------------------------
+..
+  Controller Issues and Remedies
+  ------------------------------
+コントローラーの問題と改善
+--------------------------
 
 Memory
 ~~~~~~
 
-The original lower boundary, the soft limit, is defined as a limit
-that is per default unset.  As a result, the set of cgroups that
-global reclaim prefers is opt-in, rather than opt-out.  The costs for
-optimizing these mostly negative lookups are so high that the
-implementation, despite its enormous size, does not even provide the
-basic desirable behavior.  First off, the soft limit has no
-hierarchical meaning.  All configured groups are organized in a global
-rbtree and treated like equal peers, regardless where they are located
-in the hierarchy.  This makes subtree delegation impossible.  Second,
-the soft limit reclaim pass is so aggressive that it not just
-introduces high allocation latencies into the system, but also impacts
-system performance due to overreclaim, to the point where the feature
-becomes self-defeating.
+..
+  The original lower boundary, the soft limit, is defined as a limit
+  that is per default unset.  As a result, the set of cgroups that
+  global reclaim prefers is opt-in, rather than opt-out.  The costs for
+  optimizing these mostly negative lookups are so high that the
+  implementation, despite its enormous size, does not even provide the
+  basic desirable behavior.  First off, the soft limit has no
+  hierarchical meaning.  All configured groups are organized in a global
+  rbtree and treated like equal peers, regardless where they are located
+  in the hierarchy.  This makes subtree delegation impossible.  Second,
+  the soft limit reclaim pass is so aggressive that it not just
+  introduces high allocation latencies into the system, but also impacts
+  system performance due to overreclaim, to the point where the feature
+  becomes self-defeating.
+以前の機能での下限である、ソフトリミットは、デフォルトでは設定されてい
+ない制限として定義されます。その結果、グローバルに回収される cgroup の
+セットは、オプトアウトでなく、オプトインになります。これらのほとんどが
+ネガティブになるルックアップの最適化のコストはとても高いので、その実装
+は、巨大なサイズにも関わらず、基本的な望ましい動作を提供するものではあ
+りません。まず、ソフトリミットには階層的な意味はありません。すべての設
+定されたグループがグローバルな rbtree に構造化され、階層に位置するにも
+関わらず、等価なピアのように扱われます。このため、サブツリーの委任がで
+きません。つぎに、ソフトリミットの回収パスはとても変化が激しいので、高
+い割り当てレイテンシをシステムにはもたらすだけでなく、過度な回収による
+システムパフォーマンスへの影響も引き起こし、将来的には自滅するに至るで
+しょう。
 
-The memory.low boundary on the other hand is a top-down allocated
-reserve.  A cgroup enjoys reclaim protection when it's within its low,
-which makes delegation of subtrees possible.
+..
+  The memory.low boundary on the other hand is a top-down allocated
+  reserve.  A cgroup enjoys reclaim protection when it's within its low,
+  which makes delegation of subtrees possible.
+一方、制限値 memory.low はトップダウンで割り当てられる予約です。cgroup
+は、サブツリーへの委譲が可能な、自身と祖先が low 限界値を下回っている
+場合は、回収の保護を楽しめます。第 2 に、新しい cgroup はデフォルトで
+の予約はなく、一般的なケースでは、ほとんどの cgroup が優先回収パスに対
+する資格があります。これにより、帯域外のデータ構造と回収パスを必要とせ
+ずに、ジェネリックは回収コードへ少し追加を行うだけで、新しい low 制限
+値が効率的に実装できます。ジェネリックな回収コードは、優先する最初の回
+収パス内の low で実行しているものを除いて、すべての cgroup を考慮する
+ので、個々のグループの過度な回収をなくすことができ、さらに全体のワーク
+ロードパフォーマンスを向上させます。
 
-The original high boundary, the hard limit, is defined as a strict
-limit that can not budge, even if the OOM killer has to be called.
-But this generally goes against the goal of making the most out of the
-available memory.  The memory consumption of workloads varies during
-runtime, and that requires users to overcommit.  But doing that with a
-strict upper limit requires either a fairly accurate prediction of the
-working set size or adding slack to the limit.  Since working set size
-estimation is hard and error prone, and getting it wrong results in
-OOM kills, most users tend to err on the side of a looser limit and
-end up wasting precious resources.
+..
+  The original high boundary, the hard limit, is defined as a strict
+  limit that can not budge, even if the OOM killer has to be called.
+  But this generally goes against the goal of making the most out of the
+  available memory.  The memory consumption of workloads varies during
+  runtime, and that requires users to overcommit.  But doing that with a
+  strict upper limit requires either a fairly accurate prediction of the
+  working set size or adding slack to the limit.  Since working set size
+  estimation is hard and error prone, and getting it wrong results in
+  OOM kills, most users tend to err on the side of a looser limit and
+  end up wasting precious resources.
+元の上限であるハードリミットは、OOM Killer を呼ぶ必要がある場合ですら、
+変更できない厳密な制限として定義されています。しかし、これは一般的には
+利用可能なメモリを最大限利用するというゴールに反します。負荷のメモリ消
+費は実行中に変化し、ユーザはオーバーコミットする必要があります。しかし、
+厳格な制限値でこれを行うには、ワーキングセットのサイズをかなり正確に予
+測するか、制限に余裕を加える必要があります。ワーキングセットの見積もり
+は難しく、エラーが発生しやすく、OOK Killer で間違った結果になるため、
+ほとんどのユーザは制限を緩めてエラーををお越し、貴重なリソースを無駄に
+する傾向があります。
 
-The memory.high boundary on the other hand can be set much more
-conservatively.  When hit, it throttles allocations by forcing them
-into direct reclaim to work off the excess, but it never invokes the
-OOM killer.  As a result, a high boundary that is chosen too
-aggressively will not terminate the processes, but instead it will
-lead to gradual performance degradation.  The user can monitor this
-and make corrections until the minimal memory footprint that still
-gives acceptable performance is found.
+..
+  The memory.high boundary on the other hand can be set much more
+  conservatively.  When hit, it throttles allocations by forcing them
+  into direct reclaim to work off the excess, but it never invokes the
+  OOM killer.  As a result, a high boundary that is chosen too
+  aggressively will not terminate the processes, but instead it will
+  lead to gradual performance degradation.  The user can monitor this
+  and make corrections until the minimal memory footprint that still
+  gives acceptable performance is found.
+一方、制限値 memory.high は、より控えめに設定できます。この値にヒット
+したときには、超過分を減らすために強制的に direct reclaim (メモリ要求
+時に同期してページ回収を実行する) を呼び出すことにより、割り当てを絞り
+ます。しかし、OOM Killer が呼び出されることはありません。結果として、
+頻繁にヒットする制限値はプロセスを終了させず、代わりに徐々にパフォーマ
+ンスの劣化を引き起こします。ユーザはこれをモニタリングし、受け入れでき
+るパフォーマンスが得られる最小のメモリフットプリントが見つかるまで調整
+が行えます。
 
 In extreme cases, with many concurrent allocations and a complete
 breakdown of reclaim progress within the group, the high boundary can
