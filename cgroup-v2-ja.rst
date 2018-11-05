@@ -1617,20 +1617,37 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 		その cgroup かその cgroup の子孫が実行中のプロセスを含
 		む場合は 1、そうでなければ 0 となります。
 
+..
   cgroup.max.descendants
 	A read-write single value files.  The default is "max".
 
 	Maximum allowed number of descent cgroups.
 	If the actual number of descendants is equal or larger,
 	an attempt to create a new cgroup in the hierarchy will fail.
+..
 
+  cgroup.max.descendants
+	読み書き可能な単一の値が書かれたファイルです。デフォルトは "max" です。
+
+	子孫となる cgroup の最大数です。
+	子孫の数がそれ以上になれば、その階層で新しい cgroup を作成は失敗します。
+
+..
   cgroup.max.depth
 	A read-write single value files.  The default is "max".
 
 	Maximum allowed descent depth below the current cgroup.
 	If the actual descent depth is equal or larger,
 	an attempt to create a new child cgroup will fail.
+..
 
+  cgroup.max.depth
+	読み書き可能な単一の値が書かれたファイルです。デフォルトは "max" です。
+
+	現在の cgroup が持てる子孫の深さです。
+	子孫の深さがそれ以上の深さになれば、新しい子 cgroup の作成は失敗します。
+
+..
   cgroup.stat
 	A read-only flat-keyed file with the following entries:
 
@@ -1648,6 +1665,21 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 
 		A dying cgroup can consume system resources not exceeding
 		limits, which were active at the moment of cgroup deletion.
+..
+
+  cgroup.stat
+	読み込み専用のフラットなキーのファイルです。次のエントリーを持ちます:
+
+	  nr_descendants
+		子孫となる利用可能な cgroup の総数。
+
+	  nr_dying_descendants
+		消滅途中の子孫の cgroup の総数。ユーザーが cgroup を削除した後、cgroup は消滅します。
+		cgroup は完全に消滅する前に一定時間（システムの負荷に依存します）、消滅（dying）状態として残ります。
+
+		プロセスはいかなる状況下でも消滅途中の cgroup に登録できません。消滅途中の cgroup は復活できません。
+
+		消滅途中の cgroup は、cgroup 削除の瞬間にアクティブだった制限を超えない範囲で、システムリソースを消費するかもしれません。
 
 ..
   Controllers
