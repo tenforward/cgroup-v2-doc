@@ -2710,18 +2710,33 @@ inode にいっせいに書き込みにいくようなユースケースは十�
 PID
 ---
 
-The process number controller is used to allow a cgroup to stop any
-new tasks from being fork()'d or clone()'d after a specified limit is
-reached.
+..
+  The process number controller is used to allow a cgroup to stop any
+  new tasks from being fork()'d or clone()'d after a specified limit is
+  reached.
+..
 
-The number of tasks in a cgroup can be exhausted in ways which other
-controllers cannot prevent, thus warranting its own controller.  For
-example, a fork bomb is likely to exhaust the number of tasks before
-hitting memory restrictions.
+プロセス番号コントローラーは、cgroup を使って、制限に達したあとに
+fork() や clone() による新しいタスクの生成をストップできます。
 
-Note that PIDs used in this controller refer to TIDs, process IDs as
-used by the kernel.
+..
+  The number of tasks in a cgroup can be exhausted in ways which other
+  controllers cannot prevent, thus warranting its own controller.  For
+  example, a fork bomb is likely to exhaust the number of tasks before
+  hitting memory restrictions.
+..
 
+cgroup 内のタスク数は、他のコントローラでは防げない方法で枯渇する可能
+性があります。したがって自身のコントローラーで保証します。例えば、fork
+bomb は、メモリの制限に達する前にタスク数を枯渇させる可能性があります。
+
+..
+  Note that PIDs used in this controller refer to TIDs, process IDs as
+  used by the kernel.
+..
+
+このコントローラーが使う PID は、TID、つまりカーネルが使うプロセス ID
+を参照していることに注意してください。
 
 PID Interface Files
 ~~~~~~~~~~~~~~~~~~~
