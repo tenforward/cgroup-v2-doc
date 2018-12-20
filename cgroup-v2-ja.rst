@@ -2229,17 +2229,18 @@ CPU インターフェースファイル
 
 	  kernel_stack
 		Amount of memory allocated to kernel stacks.
+		カーネルスタックに割り当てられたメモリ量
 
 	  slab
-		Amount of memory used for storing in-kernel data
-		structures.
+		in-kernel のデータ構造の保存に使われているメモリ量
 
 	  sock
-		Amount of memory used in network transmission buffers
+		ネットワーク送信のバッファに使われているメモリ量
 
 	  shmem
-		Amount of cached filesystem data that is swap-backed,
-		such as tmpfs, shm segments, shared anonymous mmap()s
+		tmpfs、shm segments、共有 anonymous mmap() のような、
+		swap-backed であるキャッシュされたファイルシステムデー
+		タの量
 
 	  file_mapped
 		mmap()でマップされたファイルシステムのキャッシュデータ
