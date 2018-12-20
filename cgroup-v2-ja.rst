@@ -1884,6 +1884,7 @@ CPU インターフェースファイル
 
 	その cgroup と子孫が現在使っているメモリの総量です。
 
+..	
   memory.min
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "0".
@@ -1906,7 +1907,28 @@ CPU インターフェースファイル
 
 	If a memory cgroup is not populated with processes,
 	its memory.min is ignored.
+..
 
+  memory.min
+	読み書き可能な単一の値のファイルです。root 以外の cgroup に存
+	在し、デフォルト値は "0" です。
+
+	厳格（hard）なメモリ保護です。cgroup のメモリ使用量が、有効な
+	最低値の制限内にある場合、いかなる状況下でも cgroup のメモリは
+	回収されません。保護されていない回収可能なメモリがない場合、
+	OOM Killer が呼び出されます。
+
+	有効な最低値の制限は、すべての祖先 cgroup の memory.min の値で
+	制限されます。memory.min がオーバーコミットされている場合（子の
+	cgroup や子の複数の cgroup が、親に許可されている以上に保護さ
+	れたメモリを必要としている）、子 cgroup はそれぞれ、memory.min
+	より少ないメモリの使用量に比例して、親の保護されたメモリの一部
+	を受け取ります。
+
+	この保護下で利用可能なメモリより多くのメモリを設定することはお
+	すすめしません。このようなことは、定期的に OOM を引き起こすで
+	しょう。
+	
 ..
   memory.low
 	A read-write single value file which exists on non-root
