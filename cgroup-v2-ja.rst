@@ -1913,22 +1913,25 @@ CPU インターフェースファイル
 	読み書き可能な単一の値のファイルです。root 以外の cgroup に存
 	在し、デフォルト値は "0" です。
 
-	厳格（hard）なメモリ保護です。cgroup のメモリ使用量が、有効な
-	最低値の制限内にある場合、いかなる状況下でも cgroup のメモリは
-	回収されません。保護されていない回収可能なメモリがない場合、
-	OOM Killer が呼び出されます。
+	厳格（hard）なメモリ保護です。cgroup のメモリ使用量が、実際の
+	最低値（min）の境界内にある場合、いかなる状況下でも cgroup の
+	メモリは回収されません。保護されていない回収可能なメモリがない
+	場合、OOM Killer が呼び出されます。
 
-	有効な最低値の制限は、すべての祖先 cgroup の memory.min の値で
-	制限されます。memory.min がオーバーコミットされている場合（子の
-	cgroup や子の複数の cgroup が、親に許可されている以上に保護さ
-	れたメモリを必要としている）、子 cgroup はそれぞれ、memory.min
-	より少ないメモリの使用量に比例して、親の保護されたメモリの一部
-	を受け取ります。
+	実際の最低値（min）の境界は、すべての祖先 cgroup の memory.min
+	の値で制限されます。memory.min がオーバーコミットされている
+	（子の cgroup や子の複数の cgroup が、親に許可されている以上に
+	保護されたメモリを必要としている）場合、子 cgroup はそれぞれ、
+	memory.min より少ない実際のメモリの使用量に比例して、親の保護
+	されたメモリの一部を受け取ります。
 
 	この保護下で利用可能なメモリより多くのメモリを設定することはお
 	すすめしません。このようなことは、定期的に OOM を引き起こすで
 	しょう。
-	
+
+	メモリ cgroup にプロセスが設定されていない場合、memory.min は
+	無視されます。
+
 ..
   memory.low
 	A read-write single value file which exists on non-root
@@ -1956,19 +1959,19 @@ CPU インターフェースファイル
 	在し、デフォルト値は "0" です。
 
 	ベストエフォートのメモリ保護です。ある cgroup とすべての祖先の
-	メモリ使用量が low 限界より下であれば、保護されていない cgroup
+	メモリ使用量が low 境界より下であれば、保護されていない cgroup
 	からの回収ができない場合をのぞいて、その cgroup のメモリが回収
 	されることはないでしょう。
 
-	Effective low boundary is limited by memory.low values of
-	all ancestor cgroups. If there is memory.low overcommitment
-	(child cgroup or cgroups are requiring more protected memory
-	than parent will allow), then each child cgroup will get
-	the part of parent's protection proportional to its
-	actual memory usage below memory.low.
+	実際の low 境界は、すべての祖先の cgroup の memory.low の値に
+	よって制限されます。memory.low がオーバーコミットされている
+	（子 cgroup や子の複数の cgroup が親に許可されている以上に保護
+	されたメモリを必要としている）場合、子 cgroup はそれぞれ、
+	memory.low より少ない実際のメモリ使用量に比例して、親の保護さ
+	れたメモリの一部を受け取ります。
 
-	この保護の下に一般的に利用可能な以上のメモリを置くことは推奨し
-	ません。
+	この保護下で利用可能なメモリより多くのメモリを設定することはお
+	すすめしません。
 
 ..
   memory.high
