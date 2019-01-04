@@ -2259,12 +2259,11 @@ CPU インターフェースファイル
 		のメモリ量、Swap-backedの量、Filesystem-backed の量
 
 	  slab_reclaimable
-		Part of "slab" that might be reclaimed, such as
-		dentries and inodes.
+		回収される可能性のある dentry や inode のような、
+		"slab" 部分
 
 	  slab_unreclaimable
-		Part of "slab" that cannot be reclaimed on memory
-		pressure.
+		メモリ圧力時に回収できない "slab" の部分。
 
 	  pgfault
 		ページフォルトの総数
@@ -2273,34 +2272,35 @@ CPU インターフェースファイル
 		メジャーページフォルトの総数
 
 	  workingset_refault
-		Number of refaults of previously evicted pages
+		以前に追い出されたページのリフォールト（refault）数
 
 	  workingset_activate
-		Number of refaulted pages that were immediately activated
+		すぐに activate されるリフォールトされたページ数
 
 	  workingset_nodereclaim
-		Number of times a shadow node has been reclaimed
+		shadow ノードが回収された回数
 
 	  pgrefill
-		Amount of scanned pages (in an active LRU list)
+		（アクティブな LRU リスト内の）スキャンされたページ数
 
 	  pgscan
-		Amount of scanned pages (in an inactive LRU list)
+		（インアクティブな LRU リスト内の）スキャンされたペー
+		ジ数
 
 	  pgsteal
-		Amount of reclaimed pages
+		回収されたページ数
 
 	  pgactivate
-		Amount of pages moved to the active LRU list
+		アクティブな LRU リストへ移動したページ数
 
 	  pgdeactivate
-		Amount of pages moved to the inactive LRU lis
+		インアクティブな LRU リストへ移動したページ数
 
 	  pglazyfree
-		Amount of pages postponed to be freed under memory pressure
+		メモリ圧力下で解放を延期したページ数
 
 	  pglazyfreed
-		Amount of reclaimed lazyfree pages
+		回収された lazyfree なページ数
 
 ..
   memory.swap.current
