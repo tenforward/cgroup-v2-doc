@@ -1777,6 +1777,7 @@ CPU インターフェースファイル
 
 	weight の範囲は [1, 10000] です。
 
+..
   cpu.weight.nice
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "0".
@@ -1788,6 +1789,17 @@ CPU インターフェースファイル
 	same values used by nice(2).  Because the range is smaller and
 	granularity is coarser for the nice values, the read value is
 	the closest approximation of the current weight.
+..
+
+  cpu.weight.nice
+	読み書き可能な単一の値が書かれたファイルです。root 以外の
+	cgroup に存在します。デフォルトは "0" です。
+
+	nice の値は [-20, 19] の範囲です。
+
+	このインターフェースファイルは、"cpu.weight" の代替となります。
+	そして nice(2) と同じ値を使って weight の値を読み取ったり設定
+	したりできます。
 
 ..
   cpu.max
