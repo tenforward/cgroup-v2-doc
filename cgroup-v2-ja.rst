@@ -2795,28 +2795,58 @@ bomb は、メモリの制限に達する前にタスク数を枯渇させる可
 このコントローラーが使う PID は、TID、つまりカーネルが使うプロセス ID
 を参照していることに注意してください。
 
-PID Interface Files
-~~~~~~~~~~~~~~~~~~~
+..
+  PID Interface Files
+  ~~~~~~~~~~~~~~~~~~~
 
+PID インターフェースファイル
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+..
   pids.max
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "max".
 
 	Hard limit of number of processes.
+..
 
+  pids.max
+	読み書き可能な単一の値のファイルです。root 以外の cgroup に存
+	在します。デフォルト値は "max" です。
+
+	プロセス数のハードリミットです。
+
+..
   pids.current
 	A read-only single value file which exists on all cgroups.
 
 	The number of processes currently in the cgroup and its
 	descendants.
+..
 
-Organisational operations are not blocked by cgroup policies, so it is
-possible to have pids.current > pids.max.  This can be done by either
-setting the limit to be smaller than pids.current, or attaching enough
-processes to the cgroup such that pids.current is larger than
-pids.max.  However, it is not possible to violate a cgroup PID policy
-through fork() or clone(). These will return -EAGAIN if the creation
-of a new process would cause a cgroup policy to be violated.
+  pids.current
+	読み込み専用の単一の値のファイルです。すべての cgroup に存在し
+	ます。
+
+	ファイルが存在する cgroup とその子孫の cgroup に属するプロセス
+	数です。
+
+..
+  Organisational operations are not blocked by cgroup policies, so it is
+  possible to have pids.current > pids.max.  This can be done by either
+  setting the limit to be smaller than pids.current, or attaching enough
+  processes to the cgroup such that pids.current is larger than
+  pids.max.  However, it is not possible to violate a cgroup PID policy
+  through fork() or clone(). These will return -EAGAIN if the creation
+  of a new process would cause a cgroup policy to be violated.
+
+既に存在するプロセスに対する操作は cgroup のポリシーでブロックされない
+ため、pids.current > pids.max となる可能性があります。pids.current よ
+り小さい制限を設定するか、pids.current が pidx.max より大きくなるよう
+に cgroup へのプロセス割り当てを行うことでこのような状態になる可能性が
+あります。しかし、これは fork() や clone() 経由で cgroup の PID ポリシー
+を破ることはできません。新たに生成するプロセスが cgroup の制限を超える
+ような場合は -EAGAIN が返ります。
 
 
 Device controller
