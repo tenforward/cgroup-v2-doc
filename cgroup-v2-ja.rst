@@ -2343,6 +2343,7 @@ CPU インターフェースファイル
 	スワップ使用量のハードリミット。cgroup のスワップ使用量がこの
 	制限に達した場合、cgroup の匿名メモリはスワップアウトしません。
 
+..
   memory.swap.events
 	A read-only flat-keyed file which exists on non-root cgroups.
 	The following entries are defined.  Unless specified
@@ -2363,6 +2364,26 @@ CPU インターフェースファイル
 	entries are reclaimed gradually and the swap usage may stay
 	higher than the limit for an extended period of time.  This
 	reduces the impact on the workload and memory management.
+..
+
+  memory.swap.events
+	読み込み専用のフラットなキーのファイルです。root 以外の cgroup
+	に存在します。次のようなエントリーが定義されています。特に指定
+	がない場合、このファイルの値の変化は、ファイル変更のイベントを
+	生成します。
+
+	  max
+		対象の cgroup の swap 使用量が制限値を超え、スワップの
+		割り当てが失敗した回数。
+
+	  fail
+		システム全体のスワップが不足、または制限値を超えたため、
+		スワップの割り当てが失敗した回数。
+
+	現在の使用量以下に使用量が減少すると、既に使用中のスワップエン
+	トリは徐々に回収され、スワップ消費量は長期間制限値を超えたまま
+	になる場合があります。これは、ワークロードとメモリ管理への影響
+	が軽減されます。
 
 ..
   Usage Guidelines
