@@ -2848,29 +2848,55 @@ PID インターフェースファイル
 を破ることはできません。新たに生成するプロセスが cgroup の制限を超える
 ような場合は -EAGAIN が返ります。
 
+..
+  Device controller
+  -----------------
 
-Device controller
------------------
+デバイスコントローラ
+--------------------
 
-Device controller manages access to device files. It includes both
-creation of new device files (using mknod), and access to the
-existing device files.
+..
+  Device controller manages access to device files. It includes both
+  creation of new device files (using mknod), and access to the
+  existing device files.
 
-Cgroup v2 device controller has no interface files and is implemented
-on top of cgroup BPF. To control access to device files, a user may
-create bpf programs of the BPF_CGROUP_DEVICE type and attach them
-to cgroups. On an attempt to access a device file, corresponding
-BPF programs will be executed, and depending on the return value
-the attempt will succeed or fail with -EPERM.
+デバイスコントローラはデバイスファイルへのアクセスを管理します。mknod
+を使った新しいデバイスファイルの作成と、既存のデバイスファイルへのアク
+セスの両方を含みます。
 
-A BPF_CGROUP_DEVICE program takes a pointer to the bpf_cgroup_dev_ctx
-structure, which describes the device access attempt: access type
-(mknod/read/write) and device (type, major and minor numbers).
-If the program returns 0, the attempt fails with -EPERM, otherwise
-it succeeds.
+..
+  Cgroup v2 device controller has no interface files and is implemented
+  on top of cgroup BPF. To control access to device files, a user may
+  create bpf programs of the BPF_CGROUP_DEVICE type and attach them
+  to cgroups. On an attempt to access a device file, corresponding
+  BPF programs will be executed, and depending on the return value
+  the attempt will succeed or fail with -EPERM.
 
-An example of BPF_CGROUP_DEVICE program may be found in the kernel
-source tree in the tools/testing/selftests/bpf/dev_cgroup.c file.
+Cgroup v2 のデバイスコントローラにはインターフェースファイルはありませ
+ん。cgroup BPF を使って実装されています。デバイスファイルへのアクセス
+をコントロールするには、ユーザーは BPF_CGROUP_DEVICE タイプの bpf プロ
+グラムを作成し、cgroup にそれをアタッチできます。デバイスファイルへの
+アクセスの試みは、一致する BPF プログラムが実行され、戻り値に応じて試
+みが成功するか、-EPERM を返して失敗するかします。
+
+..
+  A BPF_CGROUP_DEVICE program takes a pointer to the bpf_cgroup_dev_ctx
+  structure, which describes the device access attempt: access type
+  (mknod/read/write) and device (type, major and minor numbers).
+  If the program returns 0, the attempt fails with -EPERM, otherwise
+  it succeeds.
+
+BPF_CGROUP_DEVICE プログラムは bpf_cgroup_dev_ctx 構造体へのポインタを
+取ります。この構造体はデバイスファイルへのアクセスの試み: アクセスタイ
+プ（mknod/read/write）と、デバイス（タイプ、major, minor 番号）につい
+て記載されています。
+
+..
+  An example of BPF_CGROUP_DEVICE program may be found in the kernel
+  source tree in the tools/testing/selftests/bpf/dev_cgroup.c file.
+
+BPF_CGROUP_DEVICE プログラムの例は、カーネルソースツリーの
+tools/testing/selftests/bpf/dev_cgroup.c ファイルにあります。
 
 
 RDMA
