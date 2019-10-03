@@ -2963,6 +2963,7 @@ RDMA インターフェースファイル
 	ファイルは root 以外のすべての cgroup に存在します。
 
 	mlx4 と ocrdma デバイスの例は次のようになります::
+
 	  mlx4_0 hca_handle=1 hca_object=20
 	  ocrdma1 hca_handle=1 hca_object=23
 
