@@ -2902,12 +2902,20 @@ tools/testing/selftests/bpf/dev_cgroup.c ファイルにあります。
 RDMA
 ----
 
-The "rdma" controller regulates the distribution and accounting of
-of RDMA resources.
+..
+  The "rdma" controller regulates the distribution and accounting of
+  of RDMA resources.
 
-RDMA Interface Files
-~~~~~~~~~~~~~~~~~~~~
+"rdma" コントローラーは RDMA リソースの分配とアカウンティングを制御します。
 
+..
+  RDMA Interface Files
+  ~~~~~~~~~~~~~~~~~~~~
+
+RDMA インターフェースファイル
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+..
   rdma.max
 	A readwrite nested-keyed file that exists for all the cgroups
 	except root that describes current configured resource limit
@@ -2928,7 +2936,18 @@ RDMA Interface Files
 
 	  mlx4_0 hca_handle=2 hca_object=2000
 	  ocrdma1 hca_handle=3 hca_object=max
+..
 
+  rdma.max
+	読み書き可能なネストされたキーのファイル。ルート以外のすべての
+	cgroup に存在します。RDMA/IB デバイスに現在設定されているリソー
+	スリミットが記載されています。
+
+	行はデバイス名がキーとなっており、ソートはされていません。それ
+	ぞれの行はスペース区切りのリソース名とそのリソースに対する分配
+	可能な制限値が書かれています。
+
+..
   rdma.current
 	A read-only file that describes current resource usage.
 	It exists for all the cgroup except root.
@@ -2937,7 +2956,15 @@ RDMA Interface Files
 
 	  mlx4_0 hca_handle=1 hca_object=20
 	  ocrdma1 hca_handle=1 hca_object=23
+..
 
+  rdma.current
+	現在のリソース使用量が書かれた読み込み専用のファイルです。この
+	ファイルは root 以外のすべての cgroup に存在します。
+
+	mlx4 と ocrdma デバイスの例は次のようになります::
+	  mlx4_0 hca_handle=1 hca_object=20
+	  ocrdma1 hca_handle=1 hca_object=23
 
 Misc
 ----
