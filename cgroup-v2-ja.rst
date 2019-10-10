@@ -2973,39 +2973,76 @@ Misc
 perf_event
 ~~~~~~~~~~
 
-perf_event controller, if not mounted on a legacy hierarchy, is
-automatically enabled on the v2 hierarchy so that perf events can
-always be filtered by cgroup v2 path.  The controller can still be
-moved to a legacy hierarchy after v2 hierarchy is populated.
+..
+  perf_event controller, if not mounted on a legacy hierarchy, is
+  automatically enabled on the v2 hierarchy so that perf events can
+  always be filtered by cgroup v2 path.  The controller can still be
+  moved to a legacy hierarchy after v2 hierarchy is populated.
+
+レガシー（cgroup v1）階層でマウントされていない場合は、perf_event コン
+トローラーは v2 階層では自動的に有効になり、perf イベントは常に cgroup
+v2 パスでフィルタされます。コントローラーは、v2 階層が設定された後もレ
+ガシー（v1）階層に移動できます。
+
+..
+  Non-normative information
+  -------------------------
+
+非標準の情報
+------------
+
+..
+  This section contains information that isn't considered to be a part of
+  the stable kernel API and so is subject to change.
+
+このセクションでは、stable なカーネル API の一部とはみなされず、変更さ
+れる可能性のある情報を記載します。
+
+..
+  CPU controller root cgroup process behaviour
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+CPUコントローラーのroot cgroupのプロセスのふるまい
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+..
+  When distributing CPU cycles in the root cgroup each thread in this
+  cgroup is treated as if it was hosted in a separate child cgroup of the
+  root cgroup. This child cgroup weight is dependent on its thread nice
+  level.
+
+root cgroup 内でCPUサイクルを分配した場合、この cgroup 内のスレッドは
+それぞれ root cgroup の別々の子 cgroup 内にホストされてるかのように扱
+われます。この子 cgroup のウェイトは、そのスレッドの nice レベルに依存
+します。
+
+..
+  For details of this mapping see sched_prio_to_weight array in
+  kernel/sched/core.c file (values from this array should be scaled
+  appropriately so the neutral - nice 0 - value is 100 instead of 1024).
+
+このマッピングの詳細は、kernel/sched/core.c ファイル内の
+sched_prio_to_weight 配列を参照してください（この配列の値は、ニュート
+ラル（つまり nice 0）が 1024 の代わりに 100 になるように適切にスケール
+される必要があります）。
 
 
-Non-normative information
--------------------------
+..
+  IO controller root cgroup process behaviour
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This section contains information that isn't considered to be a part of
-the stable kernel API and so is subject to change.
+IO コントローラーの root cgroup のプロセスのふるまい
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+..
+  Root cgroup processes are hosted in an implicit leaf child node.
+  When distributing IO resources this implicit child node is taken into
+  account as if it was a normal child cgroup of the root cgroup with a
+  weight value of 200.
 
-CPU controller root cgroup process behaviour
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When distributing CPU cycles in the root cgroup each thread in this
-cgroup is treated as if it was hosted in a separate child cgroup of the
-root cgroup. This child cgroup weight is dependent on its thread nice
-level.
-
-For details of this mapping see sched_prio_to_weight array in
-kernel/sched/core.c file (values from this array should be scaled
-appropriately so the neutral - nice 0 - value is 100 instead of 1024).
-
-
-IO controller root cgroup process behaviour
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Root cgroup processes are hosted in an implicit leaf child node.
-When distributing IO resources this implicit child node is taken into
-account as if it was a normal child cgroup of the root cgroup with a
-weight value of 200.
+root cgroup のプロセスは、暗黙のリーフ子ノード内にホストされます。IO
+リソースを分配する際この暗黙の子ノードは、ウェイトの値が 200 の root
+cgroup の通常の子 cgroup のように考慮されます。
 
 
 Namespace
