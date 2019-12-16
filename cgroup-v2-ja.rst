@@ -3044,56 +3044,91 @@ root cgroup のプロセスは、暗黙のリーフ子ノード内にホスト�
 リソースを分配する際この暗黙の子ノードは、ウェイトの値が 200 の root
 cgroup の通常の子 cgroup のように考慮されます。
 
-
 Namespace
 =========
 
-Basics
-------
+..
+  Basics
+  ------
 
-cgroup namespace provides a mechanism to virtualize the view of the
-"/proc/$PID/cgroup" file and cgroup mounts.  The CLONE_NEWCGROUP clone
-flag can be used with clone(2) and unshare(2) to create a new cgroup
-namespace.  The process running inside the cgroup namespace will have
-its "/proc/$PID/cgroup" output restricted to cgroupns root.  The
-cgroupns root is the cgroup of the process at the time of creation of
-the cgroup namespace.
+基礎
+----
 
-Without cgroup namespace, the "/proc/$PID/cgroup" file shows the
-complete path of the cgroup of a process.  In a container setup where
-a set of cgroups and namespaces are intended to isolate processes the
-"/proc/$PID/cgroup" file may leak potential system level information
-to the isolated processes.  For Example::
+..
+  cgroup namespace provides a mechanism to virtualize the view of the
+  "/proc/$PID/cgroup" file and cgroup mounts.  The CLONE_NEWCGROUP clone
+  flag can be used with clone(2) and unshare(2) to create a new cgroup
+  namespace.  The process running inside the cgroup namespace will have
+  its "/proc/$PID/cgroup" output restricted to cgroupns root.  The
+  cgroupns root is the cgroup of the process at the time of creation of
+  the cgroup namespace.
+
+cgroup namespace は "/proc/$PID/cgroup" ファイルと cgroup のマウントの
+仮想化されたビュー向けのメカニズムを提供します。新しい cgroup
+namespace を作るために、clone(2) と unshare(2) で CLONE_NEWCGROUP クロー
+ンフラグが使えます。cgroup namespace 内で実行されているプロセスの
+"/proc/$PID/cgroup" ファイルの出力は cgroupns の root に制限されます。
+cgroupns の root は cgroup namespace 作成時のプロセスの cgroup です。
+
+..
+  Without cgroup namespace, the "/proc/$PID/cgroup" file shows the
+  complete path of the cgroup of a process.  In a container setup where
+  a set of cgroups and namespaces are intended to isolate processes the
+  "/proc/$PID/cgroup" file may leak potential system level information
+  to the isolated processes.  For Example::
+
+cgroup namespace なしでは、"/proc/$PID/cgroup" ファイルではプロセスの
+cgroup の完全なパスが見えていました。プロセスを隔離するために cgroup
+と namespace がセットで設定されているコンテナ内では、
+"/proc/$PID/cgroup" ファイルは、隔離されたプロセスにシステムレベルの情
+報を漏洩させてしまう可能性があります。例えば::
 
   # cat /proc/self/cgroup
   0::/batchjobs/container_id1
 
-The path '/batchjobs/container_id1' can be considered as system-data
-and undesirable to expose to the isolated processes.  cgroup namespace
-can be used to restrict visibility of this path.  For example, before
-creating a cgroup namespace, one would see::
+..
+  The path '/batchjobs/container_id1' can be considered as system-data
+  and undesirable to expose to the isolated processes.  cgroup namespace
+  can be used to restrict visibility of this path.  For example, before
+  creating a cgroup namespace, one would see::
+
+パス '/batchjobs/container_id1' はシステムデータと見なせます。隔離され
+たプロセスにそれを公開するのは望ましくありません。
 
   # ls -l /proc/self/ns/cgroup
   lrwxrwxrwx 1 root root 0 2014-07-15 10:37 /proc/self/ns/cgroup -> cgroup:[4026531835]
   # cat /proc/self/cgroup
   0::/batchjobs/container_id1
 
-After unsharing a new namespace, the view changes::
+..
+  After unsharing a new namespace, the view changes::
+
+新しい namespace を unsahre したあとは、見え方が変わります::
 
   # ls -l /proc/self/ns/cgroup
   lrwxrwxrwx 1 root root 0 2014-07-15 10:35 /proc/self/ns/cgroup -> cgroup:[4026532183]
   # cat /proc/self/cgroup
   0::/
 
-When some thread from a multi-threaded process unshares its cgroup
-namespace, the new cgroupns gets applied to the entire process (all
-the threads).  This is natural for the v2 hierarchy; however, for the
-legacy hierarchies, this may be unexpected.
+..
+  When some thread from a multi-threaded process unshares its cgroup
+  namespace, the new cgroupns gets applied to the entire process (all
+  the threads).  This is natural for the v2 hierarchy; however, for the
+  legacy hierarchies, this may be unexpected.
 
-A cgroup namespace is alive as long as there are processes inside or
-mounts pinning it.  When the last usage goes away, the cgroup
-namespace is destroyed.  The cgroupns root and the actual cgroups
-remain.
+マルチスレッドなプロセスの一部のスレッドで cgroup namespace を unshare
+したスレッドがある場合、新しい cgroupns はプロセス全体（全スレッド）に
+適用されます。
+
+..
+  A cgroup namespace is alive as long as there are processes inside or
+  mounts pinning it.  When the last usage goes away, the cgroup
+  namespace is destroyed.  The cgroupns root and the actual cgroups
+  remain.
+
+cgroup namespace は、内部にプロセスが存在するか、pinning のためにマウ
+ントされている限りは有効です。最後の使用がなくなると、cgroup namespace
+は削除されます。cgroupns root と実際の cgroup はそのまま残ります。
 
 
 The Root and Views
