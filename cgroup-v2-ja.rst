@@ -60,13 +60,24 @@ Control Group v2
      5-3. IO
        5-3-1. IO Interface Files
        5-3-2. Writeback
+       5-3-3. IO Latency
+         5-3-3-1. How IO Latency Throttling Works
+         5-3-3-2. IO Latency Interface Files
+       5-3-4. IO Priority
      5-4. PID
        5-4-1. PID Interface Files
-     5-5. Device
-     5-6. RDMA
-       5-6-1. RDMA Interface Files
-     5-7. Misc
-       5-7-1. perf_event
+     5-5. Cpuset
+       5.5-1. Cpuset Interface Files
+     5-6. Device
+     5-7. RDMA
+       5-7-1. RDMA Interface Files
+     5-8. HugeTLB
+       5.8-1. HugeTLB Interface Files
+     5-9. Misc
+       5.9-1 Miscellaneous cgroup Interface Files
+       5.9-2 Migration and Ownership
+     5-10. Others
+       5-10-1. perf_event
      5-N. Non-normative information
        5-N-1. CPU controller root cgroup process behaviour
        5-N-2. IO controller root cgroup process behaviour
@@ -284,6 +295,24 @@ nsdelegate
 	マウントすることで変更できます。このオプションは、初期の名前空
 	間以外からのマウントでは無視されます。詳しくは権限委譲のセクショ
 	ンを参照してください。
+
+  memory_localevents
+        Only populate memory.events with data for the current cgroup,
+        and not any subtrees. This is legacy behaviour, the default
+        behaviour without this option is to include subtree counts.
+        This option is system wide and can only be set on mount or
+        modified through remount from the init namespace. The mount
+        option is ignored on non-init namespace mounts.
+
+  memory_recursiveprot
+        Recursively apply memory.min and memory.low protection to
+        entire subtrees, without requiring explicit downward
+        propagation into leaf cgroups.  This allows protecting entire
+        subtrees from one another, while retaining free competition
+        within those subtrees.  This should have been the default
+        behavior but is a mount-option to avoid regressing setups
+        relying on the original semantics (e.g. specifying bogusly
+        high 'bypass' protection values at higher tree levels).
 
 ..
   Organizing Processes and Threads
@@ -1123,14 +1152,14 @@ work-conserving（処理保存・完全稼働型）です。
 ----
 
 ..
-  A cgroup is protected to be allocated upto the configured amount of
-  the resource if the usages of all its ancestors are under their
+  A cgroup is protected upto the configured amount of the resource
+  as long as the usages of all its ancestors are under their
   protected levels.  Protections can be hard guarantees or best effort
   soft boundaries.  Protections can also be over-committed in which case
   only upto the amount available to the parent is protected among
   children.
-cgroup は、すべての祖先が保護レベル以下である場合は、設定したリソース
-量まで割り当てられることは保護されています。保護は強く保証することも、
+cgroup は、そのすべての祖先の使用量が保護されたレベルを下回っている限
+り、設定されたリソース量までは保護されます。保護は強く保証することも、
 ベストエフォートでのソフトな制限とすることも可能です。保護はオーバーコ
 ミットすることもでき、この場合、親が利用可能な量までだけが子の間で保護
 されます。
@@ -1260,13 +1289,22 @@ cgroup には、独占的にある量の有限のリソースが割り当てら�
 
 ..
   - The root cgroup should be exempt from resource control and thus
-    shouldn't have resource control interface files.  Also,
-    informational files on the root cgroup which end up showing global
-    information available elsewhere shouldn't exist.
+    shouldn't have resource control interface files.
 - root cgroup はリソースコントロールから免除されなければいけません。そ
   れゆえ、コントロールのためのインターフェースファイルを持ってはいけま
-  せん。そして、最終的に利用可能なグローバル情報を表示する root cgroup
-  のインフォメーションファイルが他の場所にあってはなりません。
+  せん。
+
+..
+  - The default time unit is microseconds.  If a different unit is ever
+    used, an explicit unit suffix must be present.
+- デフォルトの時間の単位はミリ秒です。異なる単位を使用する場合、明確な
+  単位接尾語が存在している必要があります。
+
+..
+  - A parts-per quantity should use a percentage decimal with at least
+    two digit fractional part - e.g. 13.40.
+- parts-perの数量（訳注: 数量分の一、例えばparts-per million）は、少な
+  くとも 2 桁の少数部分を持つパーセントの小数部分を持つべきです。例: 13.40
 
 ..
   - If a controller implements weight based resource distribution, its
@@ -1606,6 +1644,8 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 	  populated
 		1 if the cgroup or its descendants contains any live
 		processes; otherwise, 0.
+	  frozen
+		1 if the cgroup is frozen; otherwise, 0.
 ..
 
   cgroup.events
@@ -1617,6 +1657,9 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 	  populated
 		その cgroup かその cgroup の子孫が実行中のプロセスを含
 		む場合は 1、そうでなければ 0 となります。
+	  frozen
+		その cgroup が frozen 状態の場合は 1、そうでなければ 0
+		となります。
 
 ..
   cgroup.max.descendants
@@ -1682,11 +1725,54 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 
 		消滅途中の cgroup は、cgroup 削除の瞬間にアクティブだった制限を超えない範囲で、システムリソースを消費するかもしれません。
 
+  cgroup.freeze
+	A read-write single value file which exists on non-root cgroups.
+	Allowed values are "0" and "1". The default is "0".
+
+	Writing "1" to the file causes freezing of the cgroup and all
+	descendant cgroups. This means that all belonging processes will
+	be stopped and will not run until the cgroup will be explicitly
+	unfrozen. Freezing of the cgroup may take some time; when this action
+	is completed, the "frozen" value in the cgroup.events control file
+	will be updated to "1" and the corresponding notification will be
+	issued.
+
+	A cgroup can be frozen either by its own settings, or by settings
+	of any ancestor cgroups. If any of ancestor cgroups is frozen, the
+	cgroup will remain frozen.
+
+	Processes in the frozen cgroup can be killed by a fatal signal.
+	They also can enter and leave a frozen cgroup: either by an explicit
+	move by a user, or if freezing of the cgroup races with fork().
+	If a process is moved to a frozen cgroup, it stops. If a process is
+	moved out of a frozen cgroup, it becomes running.
+
+	Frozen status of a cgroup doesn't affect any cgroup tree operations:
+	it's possible to delete a frozen (and empty) cgroup, as well as
+	create new sub-cgroups.
+
+  cgroup.kill
+	A write-only single value file which exists in non-root cgroups.
+	The only allowed value is "1".
+
+	Writing "1" to the file causes the cgroup and all descendant cgroups to
+	be killed. This means that all processes located in the affected cgroup
+	tree will be killed via SIGKILL.
+
+	Killing a cgroup tree will deal with concurrent forks appropriately and
+	is protected against migrations.
+
+	In a threaded cgroup, writing this file fails with EOPNOTSUPP as
+	killing cgroups is a process directed operation, i.e. it affects
+	the whole thread-group.
+
 ..
   Controllers
   ===========
 コントローラー
 ==============
+
+.. _cgroup-v2-cpu:
 
 CPU
 ---
@@ -1701,6 +1787,13 @@ CPU
 は、通常のスケジューリングポリシー用に weight と絶対値バンド幅制限のモ
 デルを実装します。また、リアルタイムスケジューリングポリシー用に絶対値
 バンド幅制限を実装します。
+
+In all the above models, cycles distribution is defined only on a temporal
+base and it does not account for the frequency at which tasks are executed.
+The (optional) utilization clamping support allows to hint the schedutil
+cpufreq governor about the minimum desired frequency which should always be
+provided by a CPU, as well as the maximum desired frequency, which should not
+be exceeded by a CPU.
 
 ..
   WARNING: cgroup2 doesn't yet support control of realtime processes and
@@ -1730,7 +1823,7 @@ CPU インターフェースファイル
 
 ..
   cpu.stat
-	A read-only flat-keyed file which exists on non-root cgroups.
+	A read-only flat-keyed file.
 	This file exists whether the controller is enabled or not.
 
 	It always reports the following three stats:
@@ -1744,11 +1837,12 @@ CPU インターフェースファイル
 	- nr_periods
 	- nr_throttled
 	- throttled_usec
+	- nr_bursts
+	- burst_usec
 ..
 
   cpu.stat
-	読み込み専用のフラットなキーのファイルです。このファイルは
-	root 以外の cgroup に存在します。
+	読み込み専用のフラットなキーのファイルです。
 
 	常に、次の 3 つの統計値をレポートします:
 
@@ -1762,6 +1856,8 @@ CPU インターフェースファイル
 	- nr_periods
 	- nr_throttled
 	- throttled_usec
+	- nr_bursts
+	- burst_usec
 
 ..
   cpu.weight
@@ -1827,6 +1923,46 @@ CPU インターフェースファイル
 	消費できることを示します。$MAX の値が "max" である場合は無制限
 	であることを示します。値をひとつだけ書き込んだ場合は $MAX が更
 	新されます。
+
+  cpu.max.burst
+	A read-write single value file which exists on non-root
+	cgroups.  The default is "0".
+
+	The burst in the range [0, $MAX].
+
+  cpu.pressure
+	A read-write nested-keyed file.
+
+	Shows pressure stall information for CPU. See
+	:ref:`Documentation/accounting/psi.rst <psi>` for details.
+
+  cpu.uclamp.min
+        A read-write single value file which exists on non-root cgroups.
+        The default is "0", i.e. no utilization boosting.
+
+        The requested minimum utilization (protection) as a percentage
+        rational number, e.g. 12.34 for 12.34%.
+
+        This interface allows reading and setting minimum utilization clamp
+        values similar to the sched_setattr(2). This minimum utilization
+        value is used to clamp the task specific minimum utilization clamp.
+
+        The requested minimum utilization (protection) is always capped by
+        the current value for the maximum utilization (limit), i.e.
+        `cpu.uclamp.max`.
+
+  cpu.uclamp.max
+        A read-write single value file which exists on non-root cgroups.
+        The default is "max". i.e. no utilization capping
+
+        The requested maximum utilization (limit) as a percentage rational
+        number, e.g. 98.76 for 98.76%.
+
+        This interface allows reading and setting maximum utilization clamp
+        values similar to the sched_setattr(2). This maximum utilization
+        value is used to clamp the task specific maximum utilization clamp.
+
+
 
 ..
   Memory
@@ -1905,7 +2041,10 @@ CPU インターフェースファイル
 	is within its effective min boundary, the cgroup's memory
 	won't be reclaimed under any conditions. If there is no
 	unprotected reclaimable memory available, OOM killer
-	is invoked.
+	is invoked. Above the effective min boundary (or
+	effective low boundary if it is higher), pages are reclaimed
+	proportionally to the overage, reducing reclaim pressure for
+	smaller overages.
 
 	Effective min boundary is limited by memory.min values of
 	all ancestor cgroups. If there is memory.min overcommitment
@@ -1928,7 +2067,10 @@ CPU インターフェースファイル
 	厳格（hard）なメモリ保護です。cgroup のメモリ使用量が、実際の
 	最低値（min）の境界内にある場合、いかなる状況下でも cgroup の
 	メモリは回収されません。保護されていない回収可能なメモリがない
-	場合、OOM Killer が呼び出されます。
+	場合、OOM Killer が呼び出されます。有効な最低（min）境界値（も
+	しくは、それより高い場合は有効な low 境界）を超えると、ページ
+	は超過分に比例して再利用され、より小さな超過分に対する再利用圧
+	力が低減されます。
 
 	実際の最低値（min）の境界は、すべての祖先 cgroup の memory.min
 	の値で制限されます。memory.min がオーバーコミットされている
@@ -1951,8 +2093,12 @@ CPU インターフェースファイル
 
 	Best-effort memory protection.  If the memory usage of a
 	cgroup is within its effective low boundary, the cgroup's
-	memory won't be reclaimed unless memory can be reclaimed
-	from unprotected cgroups.
+	memory won't be reclaimed unless there is no reclaimable
+	memory available in unprotected cgroups.
+	Above the effective low	boundary (or 
+	effective min boundary if it is higher), pages are reclaimed
+	proportionally to the overage, reducing reclaim pressure for
+	smaller overages.
 
 	Effective low boundary is limited by memory.low values of
 	all ancestor cgroups. If there is memory.low overcommitment
@@ -1971,8 +2117,12 @@ CPU インターフェースファイル
 
 	ベストエフォートのメモリ保護です。ある cgroup とすべての祖先の
 	メモリ使用量が low 境界より下であれば、保護されていない cgroup
-	からの回収ができない場合をのぞいて、その cgroup のメモリが回収
-	されることはないでしょう。
+	で回収できる再利用可能なメモリがない場合をのぞいては、その
+	cgroup のメモリが回収されることはないでしょう。
+	Above the effective low boundary (or 
+	effective min boundary if it is higher), pages are reclaimed
+	proportionally to the overage, reducing reclaim pressure for
+	smaller overages.
 
 	実際の low 境界は、すべての祖先の cgroup の memory.low の値に
 	よって制限されます。memory.low がオーバーコミットされている
@@ -2021,6 +2171,13 @@ CPU インターフェースファイル
 	Under certain circumstances, the usage may go over the limit
 	temporarily.
 
+	In default configuration regular 0-order allocations always
+	succeed unless OOM killer chooses current task as a victim.
+
+	Some kinds of allocations don't invoke the OOM killer.
+	Caller could retry them differently, return into userspace
+	as -ENOMEM or silently ignore in cases like disk readahead.
+
 	This is the ultimate protection mechanism.  As long as the
 	high limit is used and monitored properly, this limit's
 	utility is limited to providing the final safety net.
@@ -2035,9 +2192,34 @@ CPU インターフェースファイル
 	合、OOM killer が cgroup内で呼びだされます。特定の環境下では、
 	使用量が一時的に制限を超えるかもしれません。
 
+	In default configuration regular 0-order allocations always
+	succeed unless OOM killer chooses current task as a victim.
+
+	Some kinds of allocations don't invoke the OOM killer.
+	Caller could retry them differently, return into userspace
+	as -ENOMEM or silently ignore in cases like disk readahead.
+
 	これは最終的な保護メカニズムです。high の制限を使い、適切にモ
 	ニタリングされている限り、この制限は最終的なセーフティーネット
 	を提供という役割に限られるでしょう。
+
+  memory.oom.group
+	A read-write single value file which exists on non-root
+	cgroups.  The default value is "0".
+
+	Determines whether the cgroup should be treated as
+	an indivisible workload by the OOM killer. If set,
+	all tasks belonging to the cgroup or to its descendants
+	(if the memory cgroup is not a leaf cgroup) are killed
+	together or not at all. This can be used to avoid
+	partial kills to guarantee workload integrity.
+
+	Tasks with the OOM protection (oom_score_adj set to -1000)
+	are treated as an exception and are never killed.
+
+	If the OOM killer is invoked in a cgroup, it's not going
+	to kill any tasks outside of this cgroup, regardless
+	memory.oom.group values of ancestor cgroups.
 
 ..
   memory.events
@@ -2045,6 +2227,11 @@ CPU インターフェースファイル
 	The following entries are defined.  Unless specified
 	otherwise, a value change in this file generates a file
 	modified event.
+
+	Note that all fields in this file are hierarchical and the
+	file modified event can be generated due to an event down the
+	hierarchy. For the local events at the cgroup level see
+	memory.events.local.
 
 	  low
 		The number of times the cgroup is reclaimed due to
@@ -2069,13 +2256,9 @@ CPU インターフェースファイル
 		The number of time the cgroup's memory usage was
 		reached the limit and allocation was about to fail.
 
-		Depending on context result could be invocation of OOM
-		killer and retrying allocation or failing allocation.
-
-		Failed allocation in its turn could be returned into
-		userspace as -ENOMEM or silently ignored in cases like
-		disk readahead.  For now OOM in memory cgroup kills
-		tasks iff shortage has happened inside page fault.
+		This event is not raised if the OOM killer is not
+		considered as an option, e.g. for failed high-order
+		allocations or if caller asked to not retry attempts.
 
 	  oom_kill
 		The number of processes belonging to this cgroup
@@ -2087,6 +2270,11 @@ CPU インターフェースファイル
 	に存在します。以下のエントリが定義されています。特に指定しない
 	限り、このファイルの値の変更はファイルが修正されたイベントを生
 	成します。
+
+	Note that all fields in this file are hierarchical and the
+	file modified event can be generated due to an event down the
+	hierarchy. For the local events at the cgroup level see
+	memory.events.local.
 
 	  low
 		cgroup で、使用量が low 以下であるにも関わらず、高いメ
@@ -2104,6 +2292,14 @@ CPU インターフェースファイル
 		cgroupのメモリ使用量が max 制限を超えようとした回数で
 		す。直接メモリ回収がメモリ使用量の減少に失敗した場合、
 		cgroup は OOM 状態に移行します。
+
+	  oom
+		The number of time the cgroup's memory usage was
+		reached the limit and allocation was about to fail.
+
+		This event is not raised if the OOM killer is not
+		considered as an option, e.g. for failed high-order
+		allocations or if caller asked to not retry attempts.
 
 	  oom_kill
 		この cgroup に属するプロセスが、あらゆる種類の OOM
@@ -2123,6 +2319,10 @@ CPU インターフェースファイル
 	can show up in the middle. Don't rely on items remaining in a
 	fixed position; use the keys to look up specific values!
 
+	If the entry has no per-node counter (or not show in the
+	memory.numa_stat). We use 'npn' (non-per-node) as the tag
+	to indicate that it will not show in the memory.numa_stat.
+
 	  anon
 		Amount of memory used in anonymous mappings such as
 		brk(), sbrk(), and mmap(MAP_ANONYMOUS)
@@ -2134,11 +2334,14 @@ CPU インターフェースファイル
 	  kernel_stack
 		Amount of memory allocated to kernel stacks.
 
-	  slab
-		Amount of memory used for storing in-kernel data
-		structures.
+	  pagetables
+                Amount of memory allocated for page tables.
 
-	  sock
+	  percpu (npn)
+		Amount of memory used for storing per-cpu kernel
+		data structures.
+
+	  sock (npn)
 		Amount of memory used in network transmission buffers
 
 	  shmem
@@ -2156,10 +2359,31 @@ CPU インターフェースファイル
 		Amount of cached filesystem data that was modified and
 		is currently being written back to disk
 
+	  swapcached
+		Amount of swap cached in memory. The swapcache is accounted
+		against both memory and swap usage.
+
+	  anon_thp
+		Amount of memory used in anonymous mappings backed by
+		transparent hugepages
+
+	  file_thp
+		Amount of cached filesystem data backed by transparent
+		hugepages
+
+	  shmem_thp
+		Amount of shm, tmpfs, shared anonymous mmap()s backed by
+		transparent hugepages
+
 	  inactive_anon, active_anon, inactive_file, active_file, unevictable
 		Amount of memory, swap-backed and filesystem-backed,
 		on the internal memory management lists used by the
-		page reclaim algorithm
+		page reclaim algorithm.
+
+		As these represent internal list state (eg. shmem pages are on anon
+		memory management lists), inactive_foo + active_foo may not be equal to
+		the value for the foo counter, since the foo counter is type-based, not
+		list-based.
 
 	  slab_reclaimable
 		Part of "slab" that might be reclaimed, such as
@@ -2230,6 +2454,10 @@ CPU インターフェースファイル
 	途中で現れることもあります。項目が決まった位置にあることを期待
 	しないでください。特定の値を見つけるのにはキーを使いましょう!
 
+	If the entry has no per-node counter (or not show in the
+	memory.numa_stat). We use 'npn' (non-per-node) as the tag
+	to indicate that it will not show in the memory.numa_stat.
+
 	  anon
 		brk(), sbrk(), mmap(MAP_ANONYMOUS) のような匿名マッピ
 		ングに使われているメモリ量
@@ -2242,10 +2470,14 @@ CPU インターフェースファイル
 		Amount of memory allocated to kernel stacks.
 		カーネルスタックに割り当てられたメモリ量
 
-	  slab
-		in-kernel のデータ構造の保存に使われているメモリ量
+	  pagetables
+                Amount of memory allocated for page tables.
 
-	  sock
+	  percpu (npn)
+		Amount of memory used for storing per-cpu kernel
+		data structures.
+
+	  sock (npn)
 		ネットワーク送信のバッファに使われているメモリ量
 
 	  shmem
@@ -2265,9 +2497,30 @@ CPU インターフェースファイル
 		変更されて、ディスクに書き戻し中のファイルシステムの
 		キャッシュデータの量
 
+	  swapcached
+		Amount of swap cached in memory. The swapcache is accounted
+		against both memory and swap usage.
+
+	  anon_thp
+		Amount of memory used in anonymous mappings backed by
+		transparent hugepages
+
+	  file_thp
+		Amount of cached filesystem data backed by transparent
+		hugepages
+
+	  shmem_thp
+		Amount of shm, tmpfs, shared anonymous mmap()s backed by
+		transparent hugepages
+
 	  inactive_anon, active_anon, inactive_file, active_file, unevictable
 		ページ回収アルゴリズムが使う内部的なメモリ管理リスト上
 		のメモリ量、Swap-backedの量、Filesystem-backed の量
+
+		As these represent internal list state (eg. shmem pages are on anon
+		memory management lists), inactive_foo + active_foo may not be equal to
+		the value for the foo counter, since the foo counter is type-based, not
+		list-based.
 
 	  slab_reclaimable
 		回収される可能性のある dentry や inode のような、
