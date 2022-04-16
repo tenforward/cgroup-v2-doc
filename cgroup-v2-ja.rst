@@ -2393,51 +2393,70 @@ CPU インターフェースファイル
 		Part of "slab" that cannot be reclaimed on memory
 		pressure.
 
-	  pgfault
-		Total number of page faults incurred
+	  slab (npn)
+		Amount of memory used for storing in-kernel data
+		structures.
 
-	  pgmajfault
-		Number of major page faults incurred
+	  workingset_refault_anon
+		Number of refaults of previously evicted anonymous pages.
 
-	  workingset_refault
+	  workingset_refault_file
+		Number of refaults of previously evicted file pages.
 
-		Number of refaults of previously evicted pages
+	  workingset_activate_anon
+		Number of refaulted anonymous pages that were immediately
+		activated.
 
-	  workingset_activate
+	  workingset_activate_file
+		Number of refaulted file pages that were immediately activated.
 
-		Number of refaulted pages that were immediately activated
+	  workingset_restore_anon
+		Number of restored anonymous pages which have been detected as
+		an active workingset before they got reclaimed.
+
+	  workingset_restore_file
+		Number of restored file pages which have been detected as an
+		active workingset before they got reclaimed.
 
 	  workingset_nodereclaim
-
 		Number of times a shadow node has been reclaimed
 
-	  pgrefill
+	  pgfault (npn)
+		Total number of page faults incurred
 
+	  pgmajfault (npn)
+		Number of major page faults incurred
+
+	  pgrefill (npn)
 		Amount of scanned pages (in an active LRU list)
 
-	  pgscan
-
+	  pgscan (npn)
 		Amount of scanned pages (in an inactive LRU list)
 
-	  pgsteal
-
+	  pgsteal (npn)
 		Amount of reclaimed pages
 
-	  pgactivate
-
+	  pgactivate (npn)
 		Amount of pages moved to the active LRU list
 
-	  pgdeactivate
+	  pgdeactivate (npn)
+		Amount of pages moved to the inactive LRU list
 
-		Amount of pages moved to the inactive LRU lis
-
-	  pglazyfree
-
+	  pglazyfree (npn)
 		Amount of pages postponed to be freed under memory pressure
 
-	  pglazyfreed
-
+	  pglazyfreed (npn)
 		Amount of reclaimed lazyfree pages
+
+	  thp_fault_alloc (npn)
+		Number of transparent hugepages which were allocated to satisfy
+		a page fault. This counter is not present when CONFIG_TRANSPARENT_HUGEPAGE
+                is not set.
+
+	  thp_collapse_alloc (npn)
+		Number of transparent hugepages which were allocated to allow
+		collapsing an existing range of pages. This counter is not
+		present when CONFIG_TRANSPARENT_HUGEPAGE is not set.
 ..
 
   memory.stat
@@ -2529,42 +2548,69 @@ CPU インターフェースファイル
 	  slab_unreclaimable
 		メモリ圧力時に回収できない "slab" の部分。
 
-	  pgfault
-		ページフォルトの総数
+	  slab (npn)
+		カーネル内のデータ構造をストアために使うメモリ量
 
-	  pgmajfault
-		メジャーページフォルトの総数
+	  workingset_refault_anon
+		以前に解放した匿名ページの再フォールト回数
 
-	  workingset_refault
-		以前に追い出されたページのリフォールト（refault）数
+	  workingset_refault_file
+		以前解放したファイルページの再フォールト回数
 
-	  workingset_activate
-		すぐに activate されるリフォールトされたページ数
+	  workingset_activate_anon
+		すぐに active になった再フォールトした匿名ページ数
+
+	  workingset_activate_file
+		すぐに active になった再フォールトしたファイルページ数
+
+	  workingset_restore_anon
+		回収される前に active なワーキングセットとして検出され
+		たリストアされた匿名ページ数
+
+	  workingset_restore_file
+		回収される前に active なワーキングセットとして検出され
+		たリストアされたファイルページ数
 
 	  workingset_nodereclaim
-		shadow ノードが回収された回数
+		シャドウノードが回収された回数
 
-	  pgrefill
+	  pgfault (npn)
+		発生したページフォルトの総数
+
+	  pgmajfault (npn)
+		メジャーページフォルトの総数
+
+	  pgrefill (npn)
 		（アクティブな LRU リスト内の）スキャンされたページ数
 
-	  pgscan
+	  pgscan (npn)
 		（インアクティブな LRU リスト内の）スキャンされたペー
 		ジ数
 
-	  pgsteal
+	  pgsteal (npn)
 		回収されたページ数
 
-	  pgactivate
+	  pgactivate (npn)
 		アクティブな LRU リストへ移動したページ数
 
-	  pgdeactivate
+	  pgdeactivate (npn)
 		インアクティブな LRU リストへ移動したページ数
 
-	  pglazyfree
+	  pglazyfree (npn)
 		メモリ圧力下で解放を延期したページ数
 
-	  pglazyfreed
+	  pglazyfreed (npn)
 		回収された lazyfree なページ数
+
+	  thp_fault_alloc (npn)
+		Number of transparent hugepages which were allocated to satisfy
+		a page fault. This counter is not present when CONFIG_TRANSPARENT_HUGEPAGE
+                is not set.
+
+	  thp_collapse_alloc (npn)
+		Number of transparent hugepages which were allocated to allow
+		collapsing an existing range of pages. This counter is not
+		present when CONFIG_TRANSPARENT_HUGEPAGE is not set.
 
 ..
   memory.swap.current
@@ -2580,6 +2626,22 @@ CPU インターフェースファイル
 	在します。
 
 	cgroup と自分の子孫が現在使用中の swap の総量。
+
+  memory.swap.high
+	A read-write single value file which exists on non-root
+	cgroups.  The default is "max".
+
+	Swap usage throttle limit.  If a cgroup's swap usage exceeds
+	this limit, all its further allocations will be throttled to
+	allow userspace to implement custom out-of-memory procedures.
+
+	This limit marks a point of no return for the cgroup. It is NOT
+	designed to manage the amount of swapping a workload does
+	during regular operation. Compare to memory.swap.max, which
+	prohibits swapping past a set amount, but lets the cgroup
+	continue unimpeded as long as other memory can be reclaimed.
+
+	Healthy workloads are not expected to reach this limit.
 
 ..
   memory.swap.max
@@ -2604,6 +2666,10 @@ CPU インターフェースファイル
 	otherwise, a value change in this file generates a file
 	modified event.
 
+	  high
+		The number of times the cgroup's swap usage was over
+		the high threshold.
+
 	  max
 		The number of times the cgroup's swap usage was about
 		to go over the max boundary and swap allocation
@@ -2626,6 +2692,10 @@ CPU インターフェースファイル
 	がない場合、このファイルの値の変化は、ファイル変更のイベントを
 	生成します。
 
+	  high
+		The number of times the cgroup's swap usage was over
+		the high threshold.
+
 	  max
 		対象の cgroup の swap 使用量が制限値を超え、スワップの
 		割り当てが失敗した回数。
@@ -2638,6 +2708,12 @@ CPU インターフェースファイル
 	トリは徐々に回収され、スワップ消費量は長期間制限値を超えたまま
 	になる場合があります。これは、ワークロードとメモリ管理への影響
 	が軽減されます。
+
+  memory.pressure
+	A read-only nested-keyed file.
+
+	Shows pressure stall information for memory. See
+	:ref:`Documentation/accounting/psi.rst <psi>` for details.
 
 ..
   Usage Guidelines
@@ -2740,8 +2816,7 @@ IOインターフェースファイル
 
 ..
   io.stat
-	A read-only nested-keyed file which exists on non-root
-	cgroups.
+	A read-only nested-keyed file.
 
 	Lines are keyed by $MAJ:$MIN device numbers and not ordered.
 	The following nested keys are defined.
@@ -2751,6 +2826,8 @@ IOインターフェースファイル
 	  wbytes	Bytes written
 	  rios		Number of read IOs
 	  wios		Number of write IOs
+	  dbytes	Bytes discarded
+	  dios		Number of discard IOs
 	  ======	===================
 
 	An example read output follows:
@@ -2760,8 +2837,7 @@ IOインターフェースファイル
 ..
 
   io.stat
-	読み込み専用のネストされたキーのファイル。ルート以外の cgroup
-	に存在します。
+	読み込み専用のネストされたキーのファイル。
 
 	行は $MAJ:$MIN というデバイス番号がキーになっており、順番には
 	並んでいません。以下のネストしたキーが定義されています。
@@ -2771,12 +2847,111 @@ IOインターフェースファイル
 	  wbytes	書き込みバイト数
 	  rios		読み込み IO 数
 	  wios		書き込み IO 数
+	  dbytes	Bytes discarded
+	  dios		Number of discard IOs
 	  ======	===================
 
 	読み込んだ際の例は以下のようになります。::
 
-	  8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353
-	  8:0 rbytes=90430464 wbytes=299008000 rios=8950 wios=1252
+	  8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353 dbytes=0 dios=0
+	  8:0 rbytes=90430464 wbytes=299008000 rios=8950 wios=1252 dbytes=50331648 dios=3021
+
+  io.cost.qos
+	A read-write nested-keyed file which exists only on the root
+	cgroup.
+
+	This file configures the Quality of Service of the IO cost
+	model based controller (CONFIG_BLK_CGROUP_IOCOST) which
+	currently implements "io.weight" proportional control.  Lines
+	are keyed by $MAJ:$MIN device numbers and not ordered.  The
+	line for a given device is populated on the first write for
+	the device on "io.cost.qos" or "io.cost.model".  The following
+	nested keys are defined.
+
+	  ======	=====================================
+	  enable	Weight-based control enable
+	  ctrl		"auto" or "user"
+	  rpct		Read latency percentile    [0, 100]
+	  rlat		Read latency threshold
+	  wpct		Write latency percentile   [0, 100]
+	  wlat		Write latency threshold
+	  min		Minimum scaling percentage [1, 10000]
+	  max		Maximum scaling percentage [1, 10000]
+	  ======	=====================================
+
+	The controller is disabled by default and can be enabled by
+	setting "enable" to 1.  "rpct" and "wpct" parameters default
+	to zero and the controller uses internal device saturation
+	state to adjust the overall IO rate between "min" and "max".
+
+	When a better control quality is needed, latency QoS
+	parameters can be configured.  For example::
+
+	  8:16 enable=1 ctrl=auto rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.0
+
+	shows that on sdb, the controller is enabled, will consider
+	the device saturated if the 95th percentile of read completion
+	latencies is above 75ms or write 150ms, and adjust the overall
+	IO issue rate between 50% and 150% accordingly.
+
+	The lower the saturation point, the better the latency QoS at
+	the cost of aggregate bandwidth.  The narrower the allowed
+	adjustment range between "min" and "max", the more conformant
+	to the cost model the IO behavior.  Note that the IO issue
+	base rate may be far off from 100% and setting "min" and "max"
+	blindly can lead to a significant loss of device capacity or
+	control quality.  "min" and "max" are useful for regulating
+	devices which show wide temporary behavior changes - e.g. a
+	ssd which accepts writes at the line speed for a while and
+	then completely stalls for multiple seconds.
+
+	When "ctrl" is "auto", the parameters are controlled by the
+	kernel and may change automatically.  Setting "ctrl" to "user"
+	or setting any of the percentile and latency parameters puts
+	it into "user" mode and disables the automatic changes.  The
+	automatic mode can be restored by setting "ctrl" to "auto".
+
+  io.cost.model
+	A read-write nested-keyed file which exists only on the root
+	cgroup.
+
+	This file configures the cost model of the IO cost model based
+	controller (CONFIG_BLK_CGROUP_IOCOST) which currently
+	implements "io.weight" proportional control.  Lines are keyed
+	by $MAJ:$MIN device numbers and not ordered.  The line for a
+	given device is populated on the first write for the device on
+	"io.cost.qos" or "io.cost.model".  The following nested keys
+	are defined.
+
+	  =====		================================
+	  ctrl		"auto" or "user"
+	  model		The cost model in use - "linear"
+	  =====		================================
+
+	When "ctrl" is "auto", the kernel may change all parameters
+	dynamically.  When "ctrl" is set to "user" or any other
+	parameters are written to, "ctrl" become "user" and the
+	automatic changes are disabled.
+
+	When "model" is "linear", the following model parameters are
+	defined.
+
+	  =============	========================================
+	  [r|w]bps	The maximum sequential IO throughput
+	  [r|w]seqiops	The maximum 4k sequential IOs per second
+	  [r|w]randiops	The maximum 4k random IOs per second
+	  =============	========================================
+
+	From the above, the builtin linear model determines the base
+	costs of a sequential and random IO and the cost coefficient
+	for the IO size.  While simple, this model can cover most
+	common device classes acceptably.
+
+	The IO cost model isn't expected to be accurate in absolute
+	sense and is scaled to the device behavior dynamically.
+
+	If needed, tools/cgroup/iocost_coef_gen.py can be used to
+	generate device-specific coefficients.
 
 ..
   io.weight
@@ -2899,6 +3074,12 @@ IOインターフェースファイル
 
 	  8:16 rbps=2097152 wbps=max riops=max wiops=max
 
+  io.pressure
+	A read-only nested-keyed file.
+
+	Shows pressure stall information for IO. See
+	:ref:`Documentation/accounting/psi.rst <psi>` for details.
+
 ..
   Writeback
   ~~~~~~~~~
@@ -2933,13 +3114,13 @@ io コントローラはメモリ領域から dirty なページを書き出す 
 
 ..
   cgroup writeback requires explicit support from the underlying
-  filesystem.  Currently, cgroup writeback is implemented on ext2, ext4
-  and btrfs.  On other filesystems, all writeback IOs are attributed to
-  the root cgroup.
+  filesystem.  Currently, cgroup writeback is implemented on ext2, ext4,
+  btrfs, f2fs, and xfs.  On other filesystems, all writeback IOs are 
+  attributed to the root cgroup.
 cgroup のライトバックは、使用するファイルシステムのサポートが必ず必要
-です。現時点では、cgroup ライトバックは ext2、ext4、btrfs に実装されて
-います。他のファイルシステムでは、すべてのライトバック IO は root
-cgroup に属します。
+です。現時点では、cgroup ライトバックは ext2、ext4、btrfs, f2fs, xfs
+に実装されています。他のファイルシステムでは、すべてのライトバック IO
+は root cgroup に属します。
 
 ..
   There are inherent differences in memory and writeback management
