@@ -3199,6 +3199,140 @@ inode にいっせいに書き込みにいくようなユースケースは十�
 	る割合に計算されます。そして、vm.dirty[_background]_ratio と同
 	様の方法で適用されます。
 
+IO Latency
+~~~~~~~~~~
+
+This is a cgroup v2 controller for IO workload protection.  You provide a group
+with a latency target, and if the average latency exceeds that target the
+controller will throttle any peers that have a lower latency target than the
+protected workload.
+
+The limits are only applied at the peer level in the hierarchy.  This means that
+in the diagram below, only groups A, B, and C will influence each other, and
+groups D and F will influence each other.  Group G will influence nobody::
+
+			[root]
+		/	   |		\
+		A	   B		C
+	       /  \        |
+	      D    F	   G
+
+
+So the ideal way to configure this is to set io.latency in groups A, B, and C.
+Generally you do not want to set a value lower than the latency your device
+supports.  Experiment to find the value that works best for your workload.
+Start at higher than the expected latency for your device and watch the
+avg_lat value in io.stat for your workload group to get an idea of the
+latency you see during normal operation.  Use the avg_lat value as a basis for
+your real setting, setting at 10-15% higher than the value in io.stat.
+
+How IO Latency Throttling Works
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+io.latency is work conserving; so as long as everybody is meeting their latency
+target the controller doesn't do anything.  Once a group starts missing its
+target it begins throttling any peer group that has a higher target than itself.
+This throttling takes 2 forms:
+
+- Queue depth throttling.  This is the number of outstanding IO's a group is
+  allowed to have.  We will clamp down relatively quickly, starting at no limit
+  and going all the way down to 1 IO at a time.
+
+- Artificial delay induction.  There are certain types of IO that cannot be
+  throttled without possibly adversely affecting higher priority groups.  This
+  includes swapping and metadata IO.  These types of IO are allowed to occur
+  normally, however they are "charged" to the originating group.  If the
+  originating group is being throttled you will see the use_delay and delay
+  fields in io.stat increase.  The delay value is how many microseconds that are
+  being added to any process that runs in this group.  Because this number can
+  grow quite large if there is a lot of swapping or metadata IO occurring we
+  limit the individual delay events to 1 second at a time.
+
+Once the victimized group starts meeting its latency target again it will start
+unthrottling any peer groups that were throttled previously.  If the victimized
+group simply stops doing IO the global counter will unthrottle appropriately.
+
+IO Latency Interface Files
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  io.latency
+	This takes a similar format as the other controllers.
+
+		"MAJOR:MINOR target=<target time in microseconds"
+
+  io.stat
+	If the controller is enabled you will see extra stats in io.stat in
+	addition to the normal ones.
+
+	  depth
+		This is the current queue depth for the group.
+
+	  avg_lat
+		This is an exponential moving average with a decay rate of 1/exp
+		bound by the sampling interval.  The decay rate interval can be
+		calculated by multiplying the win value in io.stat by the
+		corresponding number of samples based on the win value.
+
+	  win
+		The sampling window size in milliseconds.  This is the minimum
+		duration of time between evaluation events.  Windows only elapse
+		with IO activity.  Idle periods extend the most recent window.
+
+IO Priority
+~~~~~~~~~~~
+
+A single attribute controls the behavior of the I/O priority cgroup policy,
+namely the blkio.prio.class attribute. The following values are accepted for
+that attribute:
+
+  no-change
+	Do not modify the I/O priority class.
+
+  none-to-rt
+	For requests that do not have an I/O priority class (NONE),
+	change the I/O priority class into RT. Do not modify
+	the I/O priority class of other requests.
+
+  restrict-to-be
+	For requests that do not have an I/O priority class or that have I/O
+	priority class RT, change it into BE. Do not modify the I/O priority
+	class of requests that have priority class IDLE.
+
+  idle
+	Change the I/O priority class of all requests into IDLE, the lowest
+	I/O priority class.
+
+The following numerical values are associated with the I/O priority policies:
+
++-------------+---+
+| no-change   | 0 |
++-------------+---+
+| none-to-rt  | 1 |
++-------------+---+
+| rt-to-be    | 2 |
++-------------+---+
+| all-to-idle | 3 |
++-------------+---+
+
+The numerical value that corresponds to each I/O priority class is as follows:
+
++-------------------------------+---+
+| IOPRIO_CLASS_NONE             | 0 |
++-------------------------------+---+
+| IOPRIO_CLASS_RT (real-time)   | 1 |
++-------------------------------+---+
+| IOPRIO_CLASS_BE (best effort) | 2 |
++-------------------------------+---+
+| IOPRIO_CLASS_IDLE             | 3 |
++-------------------------------+---+
+
+The algorithm to set the I/O priority class for a request is as follows:
+
+- Translate the I/O priority class policy into a number.
+- Change the request I/O priority class into the maximum of the I/O priority
+  class policy number and the numerical I/O priority class.
+
+
 PID
 ---
 
@@ -3283,6 +3417,192 @@ PID インターフェースファイル
 を破ることはできません。新たに生成するプロセスが cgroup の制限を超える
 ような場合は -EAGAIN が返ります。
 
+
+Cpuset
+------
+
+The "cpuset" controller provides a mechanism for constraining
+the CPU and memory node placement of tasks to only the resources
+specified in the cpuset interface files in a task's current cgroup.
+This is especially valuable on large NUMA systems where placing jobs
+on properly sized subsets of the systems with careful processor and
+memory placement to reduce cross-node memory access and contention
+can improve overall system performance.
+
+The "cpuset" controller is hierarchical.  That means the controller
+cannot use CPUs or memory nodes not allowed in its parent.
+
+
+Cpuset Interface Files
+~~~~~~~~~~~~~~~~~~~~~~
+
+  cpuset.cpus
+	A read-write multiple values file which exists on non-root
+	cpuset-enabled cgroups.
+
+	It lists the requested CPUs to be used by tasks within this
+	cgroup.  The actual list of CPUs to be granted, however, is
+	subjected to constraints imposed by its parent and can differ
+	from the requested CPUs.
+
+	The CPU numbers are comma-separated numbers or ranges.
+	For example::
+
+	  # cat cpuset.cpus
+	  0-4,6,8-10
+
+	An empty value indicates that the cgroup is using the same
+	setting as the nearest cgroup ancestor with a non-empty
+	"cpuset.cpus" or all the available CPUs if none is found.
+
+	The value of "cpuset.cpus" stays constant until the next update
+	and won't be affected by any CPU hotplug events.
+
+  cpuset.cpus.effective
+	A read-only multiple values file which exists on all
+	cpuset-enabled cgroups.
+
+	It lists the onlined CPUs that are actually granted to this
+	cgroup by its parent.  These CPUs are allowed to be used by
+	tasks within the current cgroup.
+
+	If "cpuset.cpus" is empty, the "cpuset.cpus.effective" file shows
+	all the CPUs from the parent cgroup that can be available to
+	be used by this cgroup.  Otherwise, it should be a subset of
+	"cpuset.cpus" unless none of the CPUs listed in "cpuset.cpus"
+	can be granted.  In this case, it will be treated just like an
+	empty "cpuset.cpus".
+
+	Its value will be affected by CPU hotplug events.
+
+  cpuset.mems
+	A read-write multiple values file which exists on non-root
+	cpuset-enabled cgroups.
+
+	It lists the requested memory nodes to be used by tasks within
+	this cgroup.  The actual list of memory nodes granted, however,
+	is subjected to constraints imposed by its parent and can differ
+	from the requested memory nodes.
+
+	The memory node numbers are comma-separated numbers or ranges.
+	For example::
+
+	  # cat cpuset.mems
+	  0-1,3
+
+	An empty value indicates that the cgroup is using the same
+	setting as the nearest cgroup ancestor with a non-empty
+	"cpuset.mems" or all the available memory nodes if none
+	is found.
+
+	The value of "cpuset.mems" stays constant until the next update
+	and won't be affected by any memory nodes hotplug events.
+
+	Setting a non-empty value to "cpuset.mems" causes memory of
+	tasks within the cgroup to be migrated to the designated nodes if
+	they are currently using memory outside of the designated nodes.
+
+	There is a cost for this memory migration.  The migration
+	may not be complete and some memory pages may be left behind.
+	So it is recommended that "cpuset.mems" should be set properly
+	before spawning new tasks into the cpuset.  Even if there is
+	a need to change "cpuset.mems" with active tasks, it shouldn't
+	be done frequently.
+
+  cpuset.mems.effective
+	A read-only multiple values file which exists on all
+	cpuset-enabled cgroups.
+
+	It lists the onlined memory nodes that are actually granted to
+	this cgroup by its parent. These memory nodes are allowed to
+	be used by tasks within the current cgroup.
+
+	If "cpuset.mems" is empty, it shows all the memory nodes from the
+	parent cgroup that will be available to be used by this cgroup.
+	Otherwise, it should be a subset of "cpuset.mems" unless none of
+	the memory nodes listed in "cpuset.mems" can be granted.  In this
+	case, it will be treated just like an empty "cpuset.mems".
+
+	Its value will be affected by memory nodes hotplug events.
+
+  cpuset.cpus.partition
+	A read-write single value file which exists on non-root
+	cpuset-enabled cgroups.  This flag is owned by the parent cgroup
+	and is not delegatable.
+
+	It accepts only the following input values when written to.
+
+	  ========	================================
+	  "root"	a partition root
+	  "member"	a non-root member of a partition
+	  ========	================================
+
+	When set to be a partition root, the current cgroup is the
+	root of a new partition or scheduling domain that comprises
+	itself and all its descendants except those that are separate
+	partition roots themselves and their descendants.  The root
+	cgroup is always a partition root.
+
+	There are constraints on where a partition root can be set.
+	It can only be set in a cgroup if all the following conditions
+	are true.
+
+	1) The "cpuset.cpus" is not empty and the list of CPUs are
+	   exclusive, i.e. they are not shared by any of its siblings.
+	2) The parent cgroup is a partition root.
+	3) The "cpuset.cpus" is also a proper subset of the parent's
+	   "cpuset.cpus.effective".
+	4) There is no child cgroups with cpuset enabled.  This is for
+	   eliminating corner cases that have to be handled if such a
+	   condition is allowed.
+
+	Setting it to partition root will take the CPUs away from the
+	effective CPUs of the parent cgroup.  Once it is set, this
+	file cannot be reverted back to "member" if there are any child
+	cgroups with cpuset enabled.
+
+	A parent partition cannot distribute all its CPUs to its
+	child partitions.  There must be at least one cpu left in the
+	parent partition.
+
+	Once becoming a partition root, changes to "cpuset.cpus" is
+	generally allowed as long as the first condition above is true,
+	the change will not take away all the CPUs from the parent
+	partition and the new "cpuset.cpus" value is a superset of its
+	children's "cpuset.cpus" values.
+
+	Sometimes, external factors like changes to ancestors'
+	"cpuset.cpus" or cpu hotplug can cause the state of the partition
+	root to change.  On read, the "cpuset.sched.partition" file
+	can show the following values.
+
+	  ==============	==============================
+	  "member"		Non-root member of a partition
+	  "root"		Partition root
+	  "root invalid"	Invalid partition root
+	  ==============	==============================
+
+	It is a partition root if the first 2 partition root conditions
+	above are true and at least one CPU from "cpuset.cpus" is
+	granted by the parent cgroup.
+
+	A partition root can become invalid if none of CPUs requested
+	in "cpuset.cpus" can be granted by the parent cgroup or the
+	parent cgroup is no longer a partition root itself.  In this
+	case, it is not a real partition even though the restriction
+	of the first partition root condition above will still apply.
+	The cpu affinity of all the tasks in the cgroup will then be
+	associated with CPUs in the nearest ancestor partition.
+
+	An invalid partition root can be transitioned back to a
+	real partition root if at least one of the requested CPUs
+	can now be granted by its parent.  In this case, the cpu
+	affinity of all the tasks in the formerly invalid partition
+	will be associated to the CPUs of the newly formed partition.
+	Changing the partition state of an invalid partition root to
+	"member" is always allowed even if child cpusets are present.
+
+
 ..
   Device controller
   -----------------
@@ -3302,33 +3622,35 @@ PID インターフェースファイル
 ..
   Cgroup v2 device controller has no interface files and is implemented
   on top of cgroup BPF. To control access to device files, a user may
-  create bpf programs of the BPF_CGROUP_DEVICE type and attach them
-  to cgroups. On an attempt to access a device file, corresponding
-  BPF programs will be executed, and depending on the return value
-  the attempt will succeed or fail with -EPERM.
+  create bpf programs of type BPF_PROG_TYPE_CGROUP_DEVICE and attach
+  them to cgroups with BPF_CGROUP_DEVICE flag. On an attempt to access a
+  device file, corresponding BPF programs will be executed, and depending
+  on the return value the attempt will succeed or fail with -EPERM.
 
 Cgroup v2 のデバイスコントローラにはインターフェースファイルはありませ
 ん。cgroup BPF を使って実装されています。デバイスファイルへのアクセス
-をコントロールするには、ユーザーは BPF_CGROUP_DEVICE タイプの bpf プロ
-グラムを作成し、cgroup にそれをアタッチできます。デバイスファイルへの
-アクセスの試みは、一致する BPF プログラムが実行され、戻り値に応じて試
-みが成功するか、-EPERM を返して失敗するかします。
+をコントロールするには、ユーザーは BPF_PROG_TYPE_CGROUP_DEVICE タイプ
+の bpf プログラムを作成し、BPF_CGROUP_DEVICE フラグをつけて cgroup に
+それをアタッチできます。デバイスファイルへのアクセスの試みは、一致する
+BPF プログラムが実行され、戻り値に応じて試みが成功するか、-EPERM を返
+して失敗するかします。
 
 ..
-  A BPF_CGROUP_DEVICE program takes a pointer to the bpf_cgroup_dev_ctx
-  structure, which describes the device access attempt: access type
-  (mknod/read/write) and device (type, major and minor numbers).
-  If the program returns 0, the attempt fails with -EPERM, otherwise
-  it succeeds.
+  A BPF_PROG_TYPE_CGROUP_DEVICE program takes a pointer to the
+  bpf_cgroup_dev_ctx structure, which describes the device access attempt:
+  access type (mknod/read/write) and device (type, major and minor numbers).
+  If the program returns 0, the attempt fails with -EPERM, otherwise it
+  succeeds.
 
-BPF_CGROUP_DEVICE プログラムは bpf_cgroup_dev_ctx 構造体へのポインタを
-取ります。この構造体はデバイスファイルへのアクセスの試み: アクセスタイ
-プ（mknod/read/write）と、デバイス（タイプ、major, minor 番号）につい
-て記載されています。
+BPF_PROG_TYPE_CGROUP_DEVICE プログラムは bpf_cgroup_dev_ctx 構造体への
+ポインタを取ります。この構造体はデバイスファイルへのアクセスの試み: ア
+クセスタイプ（mknod/read/write）と、デバイス（タイプ、major, minor 番
+号）について記載されています。
 
 ..
-  An example of BPF_CGROUP_DEVICE program may be found in the kernel
-  source tree in the tools/testing/selftests/bpf/dev_cgroup.c file.
+  An example of BPF_PROG_TYPE_CGROUP_DEVICE program may be found in
+  tools/testing/selftests/bpf/progs/dev_cgroup.c in the kernel source
+  tree.
 
 BPF_CGROUP_DEVICE プログラムの例は、カーネルソースツリーの
 tools/testing/selftests/bpf/dev_cgroup.c ファイルにあります。
@@ -3339,7 +3661,7 @@ RDMA
 
 ..
   The "rdma" controller regulates the distribution and accounting of
-  of RDMA resources.
+  RDMA resources.
 
 "rdma" コントローラーは RDMA リソースの分配とアカウンティングを制御します。
 
@@ -3402,8 +3724,112 @@ RDMA インターフェースファイル
 	  mlx4_0 hca_handle=1 hca_object=20
 	  ocrdma1 hca_handle=1 hca_object=23
 
+HugeTLB
+-------
+
+The HugeTLB controller allows to limit the HugeTLB usage per control group and
+enforces the controller limit during page fault.
+
+HugeTLB Interface Files
+~~~~~~~~~~~~~~~~~~~~~~~
+
+  hugetlb.<hugepagesize>.current
+	Show current usage for "hugepagesize" hugetlb.  It exists for all
+	the cgroup except root.
+
+  hugetlb.<hugepagesize>.max
+	Set/show the hard limit of "hugepagesize" hugetlb usage.
+	The default value is "max".  It exists for all the cgroup except root.
+
+  hugetlb.<hugepagesize>.events
+	A read-only flat-keyed file which exists on non-root cgroups.
+
+	  max
+		The number of allocation failure due to HugeTLB limit
+
+  hugetlb.<hugepagesize>.events.local
+	Similar to hugetlb.<hugepagesize>.events but the fields in the file
+	are local to the cgroup i.e. not hierarchical. The file modified event
+	generated on this file reflects only the local events.
+
 Misc
 ----
+
+The Miscellaneous cgroup provides the resource limiting and tracking
+mechanism for the scalar resources which cannot be abstracted like the other
+cgroup resources. Controller is enabled by the CONFIG_CGROUP_MISC config
+option.
+
+A resource can be added to the controller via enum misc_res_type{} in the
+include/linux/misc_cgroup.h file and the corresponding name via misc_res_name[]
+in the kernel/cgroup/misc.c file. Provider of the resource must set its
+capacity prior to using the resource by calling misc_cg_set_capacity().
+
+Once a capacity is set then the resource usage can be updated using charge and
+uncharge APIs. All of the APIs to interact with misc controller are in
+include/linux/misc_cgroup.h.
+
+Misc Interface Files
+~~~~~~~~~~~~~~~~~~~~
+
+Miscellaneous controller provides 3 interface files. If two misc resources (res_a and res_b) are registered then:
+
+  misc.capacity
+        A read-only flat-keyed file shown only in the root cgroup.  It shows
+        miscellaneous scalar resources available on the platform along with
+        their quantities::
+
+	  $ cat misc.capacity
+	  res_a 50
+	  res_b 10
+
+  misc.current
+        A read-only flat-keyed file shown in the non-root cgroups.  It shows
+        the current usage of the resources in the cgroup and its children.::
+
+	  $ cat misc.current
+	  res_a 3
+	  res_b 0
+
+  misc.max
+        A read-write flat-keyed file shown in the non root cgroups. Allowed
+        maximum usage of the resources in the cgroup and its children.::
+
+	  $ cat misc.max
+	  res_a max
+	  res_b 4
+
+	Limit can be set by::
+
+	  # echo res_a 1 > misc.max
+
+	Limit can be set to max by::
+
+	  # echo res_a max > misc.max
+
+        Limits can be set higher than the capacity value in the misc.capacity
+        file.
+
+  misc.events
+	A read-only flat-keyed file which exists on non-root cgroups. The
+	following entries are defined. Unless specified otherwise, a value
+	change in this file generates a file modified event. All fields in
+	this file are hierarchical.
+
+	  max
+		The number of times the cgroup's resource usage was
+		about to go over the max boundary.
+
+Migration and Ownership
+~~~~~~~~~~~~~~~~~~~~~~~
+
+A miscellaneous scalar resource is charged to the cgroup in which it is used
+first, and stays charged to that cgroup until that resource is freed. Migrating
+a process to a different cgroup does not move the charge to the destination
+cgroup where the process has moved.
+
+Others
+------
 
 perf_event
 ~~~~~~~~~~
@@ -3510,7 +3936,7 @@ cgroupns の root は cgroup namespace 作成時のプロセスの cgroup です
   complete path of the cgroup of a process.  In a container setup where
   a set of cgroups and namespaces are intended to isolate processes the
   "/proc/$PID/cgroup" file may leak potential system level information
-  to the isolated processes.  For Example::
+  to the isolated processes.  For example::
 
 cgroup namespace なしでは、"/proc/$PID/cgroup" ファイルではプロセスの
 cgroup の完全なパスが見えていました。プロセスを隔離するために cgroup
@@ -3704,14 +4130,14 @@ provides a properly isolated cgroup view inside the container.
 	す。
 
 ..
-  wbc_account_io(@wbc, @page, @bytes)
+  wbc_account_cgroup_owner(@wbc, @page, @bytes)
 	Should be called for each data segment being written out.
 	While this function doesn't care exactly when it's called
 	during the writeback session, it's the easiest and most
 	natural to call it as data segments are added to a bio.
 ..
 
-  wbc_account_io(@wbc, @page, @bytes)
+  wbc_account_cgroup_owner(@wbc, @page, @bytes)
 	各データセグメントが書き出されるたびに呼び出します。この関数は
 	ライトバックセッションのいつ呼び出されるか正確には気にしませんが、
 	データセグメントが bio に追加されるときに呼び出すのがもっとも
@@ -3735,13 +4161,13 @@ writeback bio がアノテートされると、SB_I_CGROUPWB が -> s_iflags
   the writeback session is holding shared resources, e.g. a journal
   entry, may lead to priority inversion.  There is no one easy solution
   for the problem.  Filesystems can try to work around specific problem
-  cases by skipping wbc_init_bio() or using bio_associate_blkcg()
+  cases by skipping wbc_init_bio() and using bio_associate_blkcg()
   directly.
 wbc_init_bio() は指定した bio をその cgroup に結びつけます。設定に依
 存して、bio は低い優先度で実行されるかもしれません。そして writeback
 セッションが共有リソースに縛り付けられた場合 (e.g. a journal entry)、
 優先度が逆転するかもしれません。この問題を解決する簡単な方法はありませ
-ん。ファイルシステムは wbc_init_bio() をスキップするか、
+ん。ファイルシステムは wbc_init_bio() をスキップし、
 bio_associate_blkcg() を直接使用して、特有の問題のケースを回避しよう
 とすることができます。
 
@@ -4125,18 +4551,14 @@ Memory
 
 ..
   The memory.low boundary on the other hand is a top-down allocated
-  reserve.  A cgroup enjoys reclaim protection when it's within its low,
-  which makes delegation of subtrees possible.
+  reserve.  A cgroup enjoys reclaim protection when it's within its
+  effective low, which makes delegation of subtrees possible. It also
+  enjoys having reclaim pressure proportional to its overage when
+  above its effective low.
 一方、制限値 memory.low はトップダウンで割り当てられる予約です。cgroup
-は、サブツリーへの委譲が可能な、自身と祖先が low 限界値を下回っている
-場合は、回収の保護を楽しめます。第 2 に、新しい cgroup はデフォルトで
-の予約はなく、一般的なケースでは、ほとんどの cgroup が優先回収パスに対
-する資格があります。これにより、帯域外のデータ構造と回収パスを必要とせ
-ずに、ジェネリックは回収コードへ少し追加を行うだけで、新しい low 制限
-値が効率的に実装できます。ジェネリックな回収コードは、優先する最初の回
-収パス内の low で実行しているものを除いて、すべての cgroup を考慮する
-ので、個々のグループの過度な回収をなくすことができ、さらに全体のワーク
-ロードパフォーマンスを向上させます。
+は、実際に low の範囲内である場合は、回収からの保護を受けられます。こ
+れはサブツリーへ委譲できます。また、cgroup は有効な low より上の場合に
+は、超過分に応じた回収圧力を受けます。
 
 ..
   The original high boundary, the hard limit, is defined as a strict
