@@ -3110,7 +3110,8 @@ dirty メモリの割合を調節します。
 トバック IO のコントロールを実装しています。メモリコントローラは、
 dirty なメモリの割合を計算し、維持を行うメモリ領域を定義します。そして、
 io コントローラはメモリ領域から dirty なページを書き出す io 領域を定義
-します。
+します。システム全体と cgroup ごとの dirty なメモリの両方が調べられ、2
+つのうちより制限が厳しい方を実行します。
 
 ..
   cgroup writeback requires explicit support from the underlying
