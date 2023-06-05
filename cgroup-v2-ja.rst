@@ -2856,6 +2856,7 @@ IOインターフェースファイル
 	  8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353 dbytes=0 dios=0
 	  8:0 rbytes=90430464 wbytes=299008000 rios=8950 wios=1252 dbytes=50331648 dios=3021
 
+..
   io.cost.qos
 	A read-write nested-keyed file which exists only on the root
 	cgroup.
@@ -2867,6 +2868,61 @@ IOインターフェースファイル
 	line for a given device is populated on the first write for
 	the device on "io.cost.qos" or "io.cost.model".  The following
 	nested keys are defined.
+
+	  ======	=====================================
+	  enable	Weight-based control enable
+	  ctrl		"auto" or "user"
+	  rpct		Read latency percentile    [0, 100]
+	  rlat		Read latency threshold
+	  wpct		Write latency percentile   [0, 100]
+	  wlat		Write latency threshold
+	  min		Minimum scaling percentage [1, 10000]
+	  max		Maximum scaling percentage [1, 10000]
+	  ======	=====================================
+
+	The controller is disabled by default and can be enabled by
+	setting "enable" to 1.  "rpct" and "wpct" parameters default
+	to zero and the controller uses internal device saturation
+	state to adjust the overall IO rate between "min" and "max".
+
+	When a better control quality is needed, latency QoS
+	parameters can be configured.  For example::
+
+	  8:16 enable=1 ctrl=auto rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.0
+
+	shows that on sdb, the controller is enabled, will consider
+	the device saturated if the 95th percentile of read completion
+	latencies is above 75ms or write 150ms, and adjust the overall
+	IO issue rate between 50% and 150% accordingly.
+
+	The lower the saturation point, the better the latency QoS at
+	the cost of aggregate bandwidth.  The narrower the allowed
+	adjustment range between "min" and "max", the more conformant
+	to the cost model the IO behavior.  Note that the IO issue
+	base rate may be far off from 100% and setting "min" and "max"
+	blindly can lead to a significant loss of device capacity or
+	control quality.  "min" and "max" are useful for regulating
+	devices which show wide temporary behavior changes - e.g. a
+	ssd which accepts writes at the line speed for a while and
+	then completely stalls for multiple seconds.
+
+	When "ctrl" is "auto", the parameters are controlled by the
+	kernel and may change automatically.  Setting "ctrl" to "user"
+	or setting any of the percentile and latency parameters puts
+	it into "user" mode and disables the automatic changes.  The
+	automatic mode can be restored by setting "ctrl" to "auto".
+..
+
+  io.cost.qos
+	読み書き可能なネストされたキーのファイル。root cgroupにのみ存在します。
+
+	このファイルは、現時点で "io.weight" 比例制御を実装している IO
+	コストモデルベースのコントローラー（CONFIG_BLK_CGROUP_IOCOST）
+	の QoS を設定します。行は $MAJ:$MIN デバイス番号がキーになって
+	おり、順番には並んでいません。指定されたデバイスに対する行は
+	"io.cost.qos" または "io.cost.model" のデバイスに対する書き込
+	みが最初に行われたときに有効化されます。次のネストされたキーが
+	定義されます。
 
 	  ======	=====================================
 	  enable	Weight-based control enable
