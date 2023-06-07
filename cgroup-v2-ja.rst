@@ -2925,47 +2925,48 @@ IOインターフェースファイル
 	定義されます。
 
 	  ======	=====================================
-	  enable	Weight-based control enable
+	  enable	ウェイトベースのコントロールを有効化
 	  ctrl		"auto" or "user"
-	  rpct		Read latency percentile    [0, 100]
-	  rlat		Read latency threshold
-	  wpct		Write latency percentile   [0, 100]
-	  wlat		Write latency threshold
-	  min		Minimum scaling percentage [1, 10000]
-	  max		Maximum scaling percentage [1, 10000]
+	  rpct		読み込みレイテンシーのパーセンタイル   [0, 100]
+	  rlat		読み込みレイテンシーのしきい値
+	  wpct		書き込みレイテンシーのパーセンタイル   [0, 100]
+	  wlat		書き込みレイテンシーのしきい値
+	  min		最小スケーリングパーセンタイル [1, 10000]
+	  max		最大スケーリングパーセンタイル [1, 10000]
 	  ======	=====================================
 
-	The controller is disabled by default and can be enabled by
-	setting "enable" to 1.  "rpct" and "wpct" parameters default
-	to zero and the controller uses internal device saturation
-	state to adjust the overall IO rate between "min" and "max".
+	コントローラーはデフォルトでは無効化されています。そして
+	"enable" を 1 に設定すると有効化できます。"rpct" と "wpct" パ
+	ラメーターはデフォルトでは 0 で、コントローラーは内部的なデバ
+	イスの飽和状態を使って、全体の IO レートを "min" から "max" の
+	間で調整します。
 
-	When a better control quality is needed, latency QoS
-	parameters can be configured.  For example::
+	より良い制御品質が必要であれば、レイテンシー QoS パラメーター
+	を調整できます。例えば::
 
 	  8:16 enable=1 ctrl=auto rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.0
 
-	shows that on sdb, the controller is enabled, will consider
-	the device saturated if the 95th percentile of read completion
-	latencies is above 75ms or write 150ms, and adjust the overall
-	IO issue rate between 50% and 150% accordingly.
+	は、sdb において、コントローラーが有効で、読み取り完了レイテン
+	シーの 95 パーセンタイルが 75ms 以上または書き込みが 150ms 以
+	上の場合、デバイスが飽和状態であるとみなし、それに応じて全体の
+	IO 発行レートを 50% から 150% に調整することを示しています。
 
-	The lower the saturation point, the better the latency QoS at
-	the cost of aggregate bandwidth.  The narrower the allowed
-	adjustment range between "min" and "max", the more conformant
-	to the cost model the IO behavior.  Note that the IO issue
-	base rate may be far off from 100% and setting "min" and "max"
-	blindly can lead to a significant loss of device capacity or
-	control quality.  "min" and "max" are useful for regulating
-	devices which show wide temporary behavior changes - e.g. a
-	ssd which accepts writes at the line speed for a while and
-	then completely stalls for multiple seconds.
+	飽和ポイントが低いほど、総帯域幅を犠牲にしてレイテンシー QoS
+	が向上します。"min" と "max" の間で調整範囲が狭いほど、IO動作
+	はコストモデルに適合します。IO 発行の基本レートは 100% から離
+	れている可能性があり、"min" と "max" をやみくもに設定すると、
+	デバイスのキャパシティーや制御品質が大幅に低下することにつなが
+	るかもしれないことに注意してください。
+	"min" と "max" は、一時的に挙動が大きく変化するデバイスを規制
+	するのに役立ちます。たとえば、SSD がラインスピードでしばらくの
+	間書き込みを受け付け、その後数秒間完全にストールしてしまうよう
+	な場合などです。
 
-	When "ctrl" is "auto", the parameters are controlled by the
-	kernel and may change automatically.  Setting "ctrl" to "user"
-	or setting any of the percentile and latency parameters puts
-	it into "user" mode and disables the automatic changes.  The
-	automatic mode can be restored by setting "ctrl" to "auto".
+	"ctrl" が "auto" の場合、パラメーターはカーネルが制御し、自動
+	的に変更される可能性があります。"ctrl" を "user" に設定したり、
+	パーセンタイルやレイテンシーのパラメーターを設定したりすると、
+	"user" モードになり、自動調整が無効化されます。自動モードには
+	"ctrl" を "auto" に設定することで戻せます。
 
   io.cost.model
 	A read-write nested-keyed file which exists only on the root
