@@ -3298,17 +3298,29 @@ inode にいっせいに書き込みにいくようなユースケースは十�
 	る割合に計算されます。そして、vm.dirty[_background]_ratio と同
 	様の方法で適用されます。
 
-IO Latency
-~~~~~~~~~~
+..
+  IO Latency
+  ~~~~~~~~~~
+IO レイテンシー
+~~~~~~~~~~~~~~
 
-This is a cgroup v2 controller for IO workload protection.  You provide a group
-with a latency target, and if the average latency exceeds that target the
-controller will throttle any peers that have a lower latency target than the
-protected workload.
+..
+  This is a cgroup v2 controller for IO workload protection.  You provide a group
+  with a latency target, and if the average latency exceeds that target the
+  controller will throttle any peers that have a lower latency target than the
+  protected workload.
+これは IO ワークロードを保護するための cgroup v2 コントローラーです。
+グループに対してレイテンシーのターゲットを設定し、平均レイテンシーがそ
+のターゲットを超えた場合、コントローラーは保護されたワークロードよりも
+低いターゲットを持つすべてのピアに対してスロットルをかけます。
 
-The limits are only applied at the peer level in the hierarchy.  This means that
-in the diagram below, only groups A, B, and C will influence each other, and
-groups D and F will influence each other.  Group G will influence nobody::
+..
+  The limits are only applied at the peer level in the hierarchy.  This means that
+  in the diagram below, only groups A, B, and C will influence each other, and
+  groups D and F will influence each other.  Group G will influence nobody::
+制限は階層内のピアレベルにのみ適用されます。つまり、次の図では、グルー
+プ A, B, C だけがお互いに影響しあい、グループ D と F がお互いに影響す
+ることになります。グループ G は誰にも影響を与えません。
 
 			[root]
 		/	   |		\
@@ -3316,14 +3328,22 @@ groups D and F will influence each other.  Group G will influence nobody::
 	       /  \        |
 	      D    F	   G
 
+..
+  So the ideal way to configure this is to set io.latency in groups A, B, and C.
+  Generally you do not want to set a value lower than the latency your device
+  supports.  Experiment to find the value that works best for your workload.
+  Start at higher than the expected latency for your device and watch the
+  avg_lat value in io.stat for your workload group to get an idea of the
+  latency you see during normal operation.  Use the avg_lat value as a basis for
+  your real setting, setting at 10-15% higher than the value in io.stat.
+したがって、これを設定する理想的な方法は、グループ A, B, C で
+io.latency を設定することです。一般的に、デバイスがサポートするレイテ
+ンシーより低い値を設定することはしたくありません。ワークロードに最適な
+値を見つけるために実験してください。デバイスの期待するレイテンシーより
+高い値で開始し、ワークロードグループの io.stat の avg_lat の値を見て、
+通常動作時のレイテンシーを把握します。実際の設定のベースとして avg_lat
+の値を使用し、io.stat の値より 10-15% ほど高い値を設定します。
 
-So the ideal way to configure this is to set io.latency in groups A, B, and C.
-Generally you do not want to set a value lower than the latency your device
-supports.  Experiment to find the value that works best for your workload.
-Start at higher than the expected latency for your device and watch the
-avg_lat value in io.stat for your workload group to get an idea of the
-latency you see during normal operation.  Use the avg_lat value as a basis for
-your real setting, setting at 10-15% higher than the value in io.stat.
 
 How IO Latency Throttling Works
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
