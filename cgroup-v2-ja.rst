@@ -3320,7 +3320,7 @@ IO レイテンシー
   groups D and F will influence each other.  Group G will influence nobody::
 制限は階層内のピアレベルにのみ適用されます。つまり、次の図では、グルー
 プ A, B, C だけがお互いに影響しあい、グループ D と F がお互いに影響す
-ることになります。グループ G は誰にも影響を与えません。
+ることになります。グループ G は誰にも影響を与えません::
 
 			[root]
 		/	   |		\
