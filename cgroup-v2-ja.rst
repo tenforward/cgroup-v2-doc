@@ -3344,32 +3344,59 @@ io.latency を設定することです。一般的に、デバイスがサポー
 通常動作時のレイテンシーを把握します。実際の設定のベースとして avg_lat
 の値を使用し、io.stat の値より 10-15% ほど高い値を設定します。
 
+..
+  How IO Latency Throttling Works
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+IO レイテンシースロットリングはどのように働くか
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-How IO Latency Throttling Works
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+..
+  io.latency is work conserving; so as long as everybody is meeting their latency
+  target the controller doesn't do anything.  Once a group starts missing its
+  target it begins throttling any peer group that has a higher target than itself.
+  This throttling takes 2 forms:
+io.latency は必要以上に作業を行いません。すべてがレイテンシーターゲッ
+トを達成している間は、コントローラーは何もしません。あるグループがター
+ゲットを達成できなくなると、そのグループより高いターゲットを持つピアグ
+ループに対してスロットリングを開始します。このスロットリングには 2 つ
+の形式があります:
 
-io.latency is work conserving; so as long as everybody is meeting their latency
-target the controller doesn't do anything.  Once a group starts missing its
-target it begins throttling any peer group that has a higher target than itself.
-This throttling takes 2 forms:
+..
+  - Queue depth throttling.  This is the number of outstanding IO's a group is
+    allowed to have.  We will clamp down relatively quickly, starting at no limit
+    and going all the way down to 1 IO at a time.
+- キューの深さのスロットリング。これは、グループが持てる未処理 IO 数で
+  す。制限なしから始めて、同時に全体的に 1 IO に達するまで、比較的すみ
+  やかに締め付けます。
 
-- Queue depth throttling.  This is the number of outstanding IO's a group is
-  allowed to have.  We will clamp down relatively quickly, starting at no limit
-  and going all the way down to 1 IO at a time.
+..
+  - Artificial delay induction.  There are certain types of IO that cannot be
+    throttled without possibly adversely affecting higher priority groups.  This
+    includes swapping and metadata IO.  These types of IO are allowed to occur
+    normally, however they are "charged" to the originating group.  If the
+    originating group is being throttled you will see the use_delay and delay
+    fields in io.stat increase.  The delay value is how many microseconds that are
+    being added to any process that runs in this group.  Because this number can
+    grow quite large if there is a lot of swapping or metadata IO occurring we
+    limit the individual delay events to 1 second at a time.
+- 人為的な遅延誘導。特定のタイプの IO は、優先度の高いグループに悪影響
+  を及ぼす恐れがあるので、制限をかけられません。これは、スワッピングや
+  メタデータの IO が含まれます。これらのタイプの IO は通常発生すること
+  は許可されます。しかし、発生したグループにチャージ（請求）されます。
+  発生グループがスロットルされている場合、io.stat の use_delay と
+  delay フィールドが増加することがわかります。delay の値は、このグルー
+  プ内で実行されるプロセスに足されるマイクロ秒です。多くのスワッピング
+  やメタデータ IO が発生している場合、この数値は非常に大きくなる可能性
+  があるため、個々の遅延イベントを 1 度に 1 秒に制限しています。
 
-- Artificial delay induction.  There are certain types of IO that cannot be
-  throttled without possibly adversely affecting higher priority groups.  This
-  includes swapping and metadata IO.  These types of IO are allowed to occur
-  normally, however they are "charged" to the originating group.  If the
-  originating group is being throttled you will see the use_delay and delay
-  fields in io.stat increase.  The delay value is how many microseconds that are
-  being added to any process that runs in this group.  Because this number can
-  grow quite large if there is a lot of swapping or metadata IO occurring we
-  limit the individual delay events to 1 second at a time.
-
-Once the victimized group starts meeting its latency target again it will start
-unthrottling any peer groups that were throttled previously.  If the victimized
-group simply stops doing IO the global counter will unthrottle appropriately.
+..
+  Once the victimized group starts meeting its latency target again it will start
+  unthrottling any peer groups that were throttled previously.  If the victimized
+  group simply stops doing IO the global counter will unthrottle appropriately.
+影響を受けたグループが再びレイテンシー目標を達成しはじめると、それまで
+にスロットルされたピアグループのスロットルを解除するようになります。影
+響グループが単に IO を停止した場合、グローバルカウンターは適切にスロッ
+トルを解除します。
 
 IO Latency Interface Files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
