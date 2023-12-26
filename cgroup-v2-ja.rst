@@ -3398,14 +3398,25 @@ io.latency は必要以上に作業を行いません。すべてがレイテン
 響グループが単に IO を停止した場合、グローバルカウンターは適切にスロッ
 トルを解除します。
 
-IO Latency Interface Files
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+..
+  IO Latency Interface Files
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+IO レイテンシーインターフェースファイル
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+..
   io.latency
 	This takes a similar format as the other controllers.
 
 		"MAJOR:MINOR target=<target time in microseconds"
+..
 
+  io.latency
+	このファイルは、他のコントローラーと同様のフォーマットを取ります。
+
+		"MAJOR:MINOR target=<target time in microseconds"
+
+..
   io.stat
 	If the controller is enabled you will see extra stats in io.stat in
 	addition to the normal ones.
@@ -3423,6 +3434,27 @@ IO Latency Interface Files
 		The sampling window size in milliseconds.  This is the minimum
 		duration of time between evaluation events.  Windows only elapse
 		with IO activity.  Idle periods extend the most recent window.
+..
+
+  io.stat
+	コントローラーが有効な場合、通常の統計に加えて、io.stat に追加
+	の統計が表示されます。
+
+	  depth
+		グループの現在のキューの深さです。
+
+	  avg_lat
+		これは、サンプリング間隔によって制限される 1/exp の減
+		衰率を持つ指数移動平均です。減衰率間隔は io.stat の
+		win の値に、win の値にもとづく対応するサンプル数を乗じ
+		ることで計算できます。
+
+	  win
+		ミリ秒単位のサンプリングのウィンドウサイズ。これは、評
+		価イベント間の最小期間です。ウィンドウは IO アクティビ
+		ティでのみ経過します。アイドル期間は最新のウィンドウを
+		延長します。
+
 
 IO Priority
 ~~~~~~~~~~~
