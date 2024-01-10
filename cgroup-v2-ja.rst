@@ -2119,10 +2119,9 @@ CPU インターフェースファイル
 	メモリ使用量が low 境界より下であれば、保護されていない cgroup
 	で回収できる再利用可能なメモリがない場合をのぞいては、その
 	cgroup のメモリが回収されることはないでしょう。
-	Above the effective low boundary (or 
-	effective min boundary if it is higher), pages are reclaimed
-	proportionally to the overage, reducing reclaim pressure for
-	smaller overages.
+	有効な low 境界（もしくは、もし min 境界が low より高い場合は
+	有効な min 境界）より上では、ページは超過量に応じて回収され、
+	より小さな超過量の場合の回収圧力が軽減されます。
 
 	実際の low 境界は、すべての祖先の cgroup の memory.low の値に
 	よって制限されます。memory.low がオーバーコミットされている
