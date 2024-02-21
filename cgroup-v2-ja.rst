@@ -296,6 +296,14 @@ cgroup v2 は現時点では次のオプションが使えます。
         間以外からのマウントでは無視されます。詳しくは権限委譲のセクショ
         ンを参照してください。
 
+  favordynmods
+        Reduce the latencies of dynamic cgroup modifications such as
+        task migrations and controller on/offs at the cost of making
+        hot path operations such as forks and exits more expensive.
+        The static usage pattern of creating a cgroup, enabling
+        controllers, and then seeding it with CLONE_INTO_CGROUP is
+        not affected by this option.
+
   memory_localevents
         Only populate memory.events with data for the current cgroup,
         and not any subtrees. This is legacy behaviour, the default
@@ -313,6 +321,35 @@ cgroup v2 は現時点では次のオプションが使えます。
         behavior but is a mount-option to avoid regressing setups
         relying on the original semantics (e.g. specifying bogusly
         high 'bypass' protection values at higher tree levels).
+
+  memory_hugetlb_accounting
+        Count HugeTLB memory usage towards the cgroup's overall
+        memory usage for the memory controller (for the purpose of
+        statistics reporting and memory protetion). This is a new
+        behavior that could regress existing setups, so it must be
+        explicitly opted in with this mount option.
+
+        A few caveats to keep in mind:
+
+        * There is no HugeTLB pool management involved in the memory
+          controller. The pre-allocated pool does not belong to anyone.
+          Specifically, when a new HugeTLB folio is allocated to
+          the pool, it is not accounted for from the perspective of the
+          memory controller. It is only charged to a cgroup when it is
+          actually used (for e.g at page fault time). Host memory
+          overcommit management has to consider this when configuring
+          hard limits. In general, HugeTLB pool management should be
+          done via other mechanisms (such as the HugeTLB controller).
+        * Failure to charge a HugeTLB folio to the memory controller
+          results in SIGBUS. This could happen even if the HugeTLB pool
+          still has pages available (but the cgroup limit is hit and
+          reclaim attempt fails).
+        * Charging HugeTLB memory towards the memory controller affects
+          memory protection and reclaim dynamics. Any userspace tuning
+          (of low, min limits for e.g) needs to take this into account.
+        * HugeTLB pages utilized while this option is not selected
+          will not be tracked by the memory controller (even if cgroup
+          v2 is remounted later on).
 
 ..
   Organizing Processes and Threads
@@ -642,6 +679,14 @@ cgroup 内の "cgroup.procs" はサブツリー内のすべてのプロセスの
 ド化コントローラはリーフ cgroup に属さないスレッドと子 cgroup のスレッ
 ド間の競合を扱えなければなりません。スレッド化コントローラはそれぞれ、
 どのように競合を扱うかを定義しなければいけません。
+
+Currently, the following controllers are threaded and can be enabled
+in a threaded cgroup::
+
+- cpu
+- cpuset
+- perf_event
+- pids
 
 ..
   [Un]populated Notification
@@ -1114,6 +1159,8 @@ work-conserving（処理保存・完全稼働型）です。
 "cpu.weight" は、アクティブな子に対して比例的に CPU を分配します。これ
 がこのタイプの例です。
 
+.. _cgroupv2-limits-distributor:
+
 ..
   Limits
   ------
@@ -1121,7 +1168,7 @@ work-conserving（処理保存・完全稼働型）です。
 ----
 
 ..
-  A child can only consume upto the configured amount of the resource.
+  A child can only consume up to the configured amount of the resource.
   Limits can be over-committed - the sum of the limits of children can
   exceed the amount of resource available to the parent.
 子は設定量までだけリソースを消費できます。制限はオーバーコミットできま
@@ -1145,6 +1192,8 @@ work-conserving（処理保存・完全稼働型）です。
 "io.max" は cgroup が IO デバイス上で消費できる BPS と IOPS のどちらか
 か、両方を制限します。これがこのタイプの例です。
 
+.. _cgroupv2-protections-distributor:
+
 ..
   Protections
   -----------
@@ -1152,11 +1201,11 @@ work-conserving（処理保存・完全稼働型）です。
 ----
 
 ..
-  A cgroup is protected upto the configured amount of the resource
+  A cgroup is protected up to the configured amount of the resource
   as long as the usages of all its ancestors are under their
   protected levels.  Protections can be hard guarantees or best effort
   soft boundaries.  Protections can also be over-committed in which case
-  only upto the amount available to the parent is protected among
+  only up to the amount available to the parent is protected among
   children.
 cgroup は、そのすべての祖先の使用量が保護されたレベルを下回っている限
 り、設定されたリソース量までは保護されます。保護は強く保証することも、
@@ -1766,6 +1815,29 @@ cgroup コアファイルはすべて "cgroup." というプレフィックス�
 	killing cgroups is a process directed operation, i.e. it affects
 	the whole thread-group.
 
+  cgroup.pressure
+	A read-write single value file that allowed values are "0" and "1".
+	The default is "1".
+
+	Writing "0" to the file will disable the cgroup PSI accounting.
+	Writing "1" to the file will re-enable the cgroup PSI accounting.
+
+	This control attribute is not hierarchical, so disable or enable PSI
+	accounting in a cgroup does not affect PSI accounting in descendants
+	and doesn't need pass enablement via ancestors from root.
+
+	The reason this control attribute exists is that PSI accounts stalls for
+	each cgroup separately and aggregates it at each level of the hierarchy.
+	This may cause non-negligible overhead for some workloads when under
+	deep level of the hierarchy, in which case this control attribute can
+	be used to disable PSI accounting in the non-leaf cgroups.
+
+  irq.pressure
+	A read-write nested-keyed file.
+
+	Shows pressure stall information for IRQ/SOFTIRQ. See
+	:ref:`Documentation/accounting/psi.rst <psi>` for details.
+
 ..
   Controllers
   ===========
@@ -1832,7 +1904,7 @@ CPU インターフェースファイル
 	- user_usec
 	- system_usec
 
-	and the following three when the controller is enabled:
+	and the following five when the controller is enabled:
 
 	- nr_periods
 	- nr_throttled
@@ -1850,7 +1922,7 @@ CPU インターフェースファイル
 	- user_usec
 	- system_usec
 
-	そして、次の 3 つは、コントローラーが有効になった時からレポー
+	そして、次の 5 つは、コントローラーが有効になった時からレポー
 	トします:
 
 	- nr_periods
@@ -1906,7 +1978,7 @@ CPU インターフェースファイル
 
 	  $MAX $PERIOD
 
-	which indicates that the group may consume upto $MAX in each
+	which indicates that the group may consume up to $MAX in each
 	$PERIOD duration.  "max" for $MAX indicates no limit.  If only
 	one number is written, $MAX is updated.
 ..
@@ -2138,26 +2210,30 @@ CPU インターフェースファイル
 	A read-write single value file which exists on non-root
 	cgroups.  The default is "max".
 
-	Memory usage throttle limit.  This is the main mechanism to
-	control memory usage of a cgroup.  If a cgroup's usage goes
+	Memory usage throttle limit.  If a cgroup's usage goes
 	over the high boundary, the processes of the cgroup are
 	throttled and put under heavy reclaim pressure.
 
 	Going over the high limit never invokes the OOM killer and
-	under extreme conditions the limit may be breached.
+	under extreme conditions the limit may be breached. The high
+	limit should be used in scenarios where an external process
+	monitors the limited cgroup to alleviate heavy reclaim
+	pressure.
 ..
 
   memory.high
 	読み書き可能な単一の値のファイルです。root 以外の cgroup に存
 	在します。デフォルト値は "max" です。
 
-	メモリ使用量スロットルの制限値です。これが cgroup のメモリ使用
-	量をコントロールするためのメインのメカニズムです。cgroup のメ
-	モリ使用量が上限を超えた場合、cgroup のプロセスは調節され、厳
-	しい回収圧力の下に置かれます。
+	メモリ使用量スロットルの制限値です。cgroup のメモリ使用量が上
+	限を超えた場合、cgroup のプロセスは調節され、厳しい回収圧力の
+	下に置かれます。
 
 	上限の超過は決して OOM killer を呼び出すことはありません。極限
-	の状態下では、制限値を超えるかもしれません。
+	の状態下では、制限値を超えるかもしれません。 The high
+	limit should be used in scenarios where an external process
+	monitors the limited cgroup to alleviate heavy reclaim
+	pressure.
 
 ..
   memory.max
@@ -2186,10 +2262,17 @@ CPU インターフェースファイル
 	読み書き可能な単一の値を含むファイルです。root 以外の cgroup
 	に存在します。デフォルト値は "max" です。
 
+	Memory usage hard limit.  This is the main mechanism to limit
+	memory usage of a cgroup.  If a cgroup's memory usage reaches
+	this limit and can't be reduced, the OOM killer is invoked in
+	the cgroup. Under certain circumstances, the usage may go
+	over the limit temporarily.
+	（ここから古い訳）
 	メモリ使用量のハードリミットで、最後の保護メカニズムです。
 	cgroup のメモリ使用量がこの制限に達し、減らすことができない場
 	合、OOM killer が cgroup内で呼びだされます。特定の環境下では、
 	使用量が一時的に制限を超えるかもしれません。
+	（ここまで古い訳）
 
 	In default configuration regular 0-order allocations always
 	succeed unless OOM killer chooses current task as a victim.
